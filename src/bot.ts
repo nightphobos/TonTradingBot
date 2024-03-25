@@ -4,4 +4,3 @@ import * as process from 'process';
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
 export const bot = new TelegramBot(token, { polling: true });
-bot.setWebHook(process.env.URL ||"https://tradingbotnode.onrender.com");
