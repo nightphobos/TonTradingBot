@@ -58,8 +58,6 @@ Commands list:
 /my_wallet - Show connected wallet
 /send_tx - Send transaction
 /disconnect - Disconnect from the wallet
-
-GitHub: https://github.com/ton-connect/demo-telegram-bot
 `
         );
     });
