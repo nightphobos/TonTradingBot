@@ -11,6 +11,7 @@ import {
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
 import TelegramBot from 'node-telegram-bot-api';
+import express from 'express'
 
 async function main(): Promise<void> {
     await initRedisClient();
@@ -62,5 +63,9 @@ Commands list:
         );
     });
 }
-
+const app = express();
+app.use(express.json());
+app.listen(10000, () => {
+    console.log(`Express server is listening on 10000`);
+});
 main();
