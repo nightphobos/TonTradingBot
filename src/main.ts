@@ -52,7 +52,7 @@ async function main(): Promise<void> {
         bot.sendMessage(
             msg.chat.id,
             `
-This is an example of a telegram bot for connecting to TON wallets and sending transactions with TonConnect.
+Connect your wallet address to signup.
             
 Commands list: 
 /connect - Connect to a wallet
