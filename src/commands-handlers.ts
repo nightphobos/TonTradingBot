@@ -6,6 +6,8 @@ import TelegramBot from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
 import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException } from './utils';
 
+
+import mongo from './ton-connect/mongo';
 let newConnectRequestListenersMap = new Map<number, () => void>();
 
 export async function handleConnectCommand(msg: TelegramBot.Message): Promise<void> {
@@ -32,7 +34,12 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
                 connector.wallet!.account.chain === CHAIN.TESTNET
             )}\n\n Disconnect wallet firstly to connect a new one`
         );
-
+        let prevUser = mongo.getUserByWalletAddress(
+            toUserFriendlyAddress(
+                connector.wallet!.account.address,
+                connector.wallet!.account.chain === CHAIN.TESTNET
+            )
+        );
         return;
     }
 

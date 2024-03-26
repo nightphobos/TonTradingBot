@@ -9,13 +9,16 @@
     "stop:daemon": "pm2 stop tgbot && pm2 delete tgbot"
   },
   "dependencies": {
+    "@ston-fi/api": "^0.7.0",
+    "@ston-fi/sdk": "^0.4.0",
     "@tonconnect/sdk": "^3.0.0-beta.1",
     "dotenv": "^16.0.3",
     "express": "^4.19.1",
     "mongoose": "^8.2.3",
     "node-telegram-bot-api": "^0.61.0",
     "qrcode": "^1.5.1",
-    "redis": "^4.6.5"
+    "redis": "^4.6.5",
+    "tonweb": "^0.0.64"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
