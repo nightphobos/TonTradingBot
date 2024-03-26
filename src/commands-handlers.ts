@@ -34,12 +34,7 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
                 connector.wallet!.account.chain === CHAIN.TESTNET
             )}\n\n Disconnect wallet firstly to connect a new one`
         );
-        let prevUser = mongo.getUserByWalletAddress(
-            toUserFriendlyAddress(
-                connector.wallet!.account.address,
-                connector.wallet!.account.chain === CHAIN.TESTNET
-            )
-        );
+
         return;
     }
 
