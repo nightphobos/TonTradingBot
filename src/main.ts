@@ -14,7 +14,6 @@ import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
 import mongo from './ton-connect/mongo';
 import TonWeb from 'tonweb';
-import { mongo } from 'mongoose';
 
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
