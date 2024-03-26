@@ -79,6 +79,7 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
     });
 }
 
+
 export async function handleSendTXCommand(msg: TelegramBot.Message): Promise<void> {
     const chatId = msg.chat.id;
 
@@ -96,7 +97,7 @@ export async function handleSendTXCommand(msg: TelegramBot.Message): Promise<voi
                 (Date.now() + Number(process.env.DELETE_SEND_TX_MESSAGE_TIMEOUT_MS)) / 1000
             ),
             messages: [
-                {
+                { 
                     amount: '1000000',
                     address: '0:0000000000000000000000000000000000000000000000000000000000000000'
                 }

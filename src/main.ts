@@ -13,7 +13,7 @@ import { initRedisClient } from './ton-connect/storage';
 import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
 import TonWeb from 'tonweb';
-import { User, getUserByTelegramID, createUser, connect } from './ton-connect/mongo';
+import { User, getUserByTelegramID, createUser, connect, updateUserState } from './ton-connect/mongo';
 
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
@@ -43,6 +43,18 @@ async function main(): Promise<void> {
         }
 
         callbacks[request.method as keyof typeof callbacks](query, request.data);
+    });
+
+    bot.on('message', msg => {
+        const userState = getUserByTelegramID(msg.from?.id);
+        if (userState == 'waitForTraingToken') {
+            updateUserState(msg.from?.id, 'waitForChoosePair');
+            global.userMessage = msg.text;
+        }
+        if (msg.text.toString().toLowerCase().indexOf(Hi) === 0) {
+            bot.sendMessage(msg.chat.id,"Hello dear user");
+        }
+
     });
 
     bot.onText(/\/connect/, handleConnectCommand);
@@ -89,6 +101,7 @@ async function main(): Promise<void> {
             `
 Your telegram Wallet Address : ${telegramWalletAddress}
 Commands list: 
+/trade - Start trading
 /connect - Connect your wallet
 /my_wallet - Show connected wallet
 /deposit - Deposit jettons to telegram wallet 
@@ -103,6 +116,4 @@ app.use(express.json());
 app.listen(10000, () => {
     console.log(`Express server is listening on 10000`);
 });
-main();
-
-
+main(); 

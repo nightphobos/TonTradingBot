@@ -15,6 +15,7 @@ export interface User {
     telegramID: string;
     walletAddress: string;
     secretKey: string;
+    state: string;
     orderingData?: OrderingData[];
 }
 
@@ -28,7 +29,15 @@ export async function connect(): Promise<MongoClient> {
     await client.connect();
     return client;
 }
-
+//update user states
+export async function updateUserState(telegramID: number, newState: string): Promise<void> {
+    let telegramIDString = String(telegramID);
+    const db = await connect();
+    await db
+        .db(dbName)
+        .collection<User>('users')
+        .updateOne({ telegramIDString }, { $set: { state: newState } });
+}
 // Create a new user
 export async function createUser(user: User): Promise<ObjectId> {
     const db = await connect();
@@ -37,9 +46,10 @@ export async function createUser(user: User): Promise<ObjectId> {
 }
 
 // Get a user by Telegram ID
-export async function getUserByTelegramID(telegramID: string): Promise<User | null> {
+export async function getUserByTelegramID(telegramID: number): Promise<User | null> {
+
     const db = await connect();
-    return db.db(dbName).collection<User>('users').findOne({ telegramID });
+    return db.db(dbName).collection<User>('users').findOne({ String(telegramID) });
 }
 
 // Add ordering data to a user

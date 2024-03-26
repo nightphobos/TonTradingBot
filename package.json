@@ -9,8 +9,10 @@
     "stop:daemon": "pm2 stop tgbot && pm2 delete tgbot"
   },
   "dependencies": {
+    "@dedust/sdk": "^0.8.7",
     "@ston-fi/api": "^0.7.0",
     "@ston-fi/sdk": "^0.4.0",
+    "@ton/core": "^0.56.3",
     "@tonconnect/sdk": "^3.0.0-beta.1",
     "dotenv": "^16.0.3",
     "express": "^4.19.1",
