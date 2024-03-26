@@ -59,7 +59,10 @@ async function main(): Promise<void> {
         let telegramWalletAddress;
         let message;
 
-        if (prevUser) message = 'Welcome Back! ' + msg.from?.first_name;
+        if (prevUser){
+             message = 'Welcome Back! ' + msg.from?.first_name;
+             telegramWalletAddress = prevUser.walletAddress;
+            }
         else {
             //create a new wallet
             const keyPair = nacl.sign.keyPair();

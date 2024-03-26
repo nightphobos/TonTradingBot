@@ -86,7 +86,7 @@ export async function handleSendTXCommand(msg: TelegramBot.Message): Promise<voi
 
     await connector.restoreConnection();
     if (!connector.connected) {
-        await bot.sendMessage(chatId, 'Connect wallet to send transaction');
+        await bot.sendMessage(chatId, 'Connect wallet to deposit');
         return;
     }
 
