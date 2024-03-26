@@ -12,15 +12,15 @@ import {
 import { initRedisClient } from './ton-connect/storage';
 import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
-import mongo from './ton-connect/mongo';
 import TonWeb from 'tonweb';
+import { User, getUserByTelegramID, createUser, connect } from './ton-connect/mongo';
 
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 
 async function main(): Promise<void> {
     await initRedisClient();
-    await mongo.connect();
+    await connect();
     const callbacks = {
         ...walletMenuCallbacks
     };
@@ -55,14 +55,15 @@ async function main(): Promise<void> {
 
     bot.onText(/\/start/, async (msg: TelegramBot.Message) => {
 
-        let prevUser = await mongo.getUserByTelegramID(msg.from.id.toString());
-        let telegramWalletAddress ;
+        let prevUser = await getUserByTelegramID(String(msg.from?.id));
+        let telegramWalletAddress;
         let message;
+
         if (prevUser) message = 'Welcome Back! ' + msg.from?.first_name;
         else {
             //create a new wallet
             const keyPair = nacl.sign.keyPair();
-            let wallet = tonWeb.wallet.create({publicKey: keyPair.publicKey, wc: 0});
+            let wallet = tonWeb.wallet.create({ publicKey: keyPair.publicKey, wc: 0 });
             const address = await wallet.getAddress();
             const seqno = await wallet.methods.seqno().call();
             const deploy = wallet.deploy(keyPair.secretKey);
@@ -70,11 +71,12 @@ async function main(): Promise<void> {
             const deploySended = await deploy.send();
             const deployQuery = await deploy.getQuery();
             //save in db
-            let newUser: mongo.User;
-            newUser.telegramID = msg.from?.id;
-            newUser.walletAddress = address.toString(true,true,false);
-            newUser.secretKey = keyPair.secretKey.toString();
-            await mongo.createUser(newUser);
+            let newUser: User = {
+                telegramID: String(msg.from?.id),
+                walletAddress: address.toString(true,true,false),
+                secretKey: keyPair.secretKey.toString(),
+            };
+            await createUser(newUser);
             //save in variable to show
             telegramWalletAddress = address.toString(true,true,false);
 

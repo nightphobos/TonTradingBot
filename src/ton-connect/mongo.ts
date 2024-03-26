@@ -15,7 +15,7 @@ export interface User {
     telegramID: string;
     walletAddress: string;
     secretKey: string;
-    orderingData: OrderingData[];
+    orderingData?: OrderingData[];
 }
 
 // MongoDB connection URI
