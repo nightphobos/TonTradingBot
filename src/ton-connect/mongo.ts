@@ -20,7 +20,7 @@ export interface User {
 }
 
 // MongoDB connection URI
-const uri = 'mongodb+srv://dusanpracaex:6yhn7ujm8ik@cluster0.7lclbo1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0' || process.env.MONGOURI;
+const uri = 'mongodb://127.0.0.1:27017/';
 const dbName = 'TelegramBot';
 
 // Connect to MongoDB
@@ -49,7 +49,7 @@ export async function createUser(user: User): Promise<ObjectId> {
 export async function getUserByTelegramID(telegramID: number): Promise<User | null> {
 
     const db = await connect();
-    return db.db(dbName).collection<User>('users').findOne({ String(telegramID) });
+    return db.db(dbName).collection<User>('users').findOne({ telegramID: String(telegramID) });
 }
 
 // Add ordering data to a user
@@ -58,7 +58,7 @@ export async function addOrderingDataToUser(
     orderingData: OrderingData
 ): Promise<void> {
     const db = await connect();
-    await db.db(dbName).collection<User>('users').updateOne({ telegramID }, { $push: { orderingData } });
+    await db.db(dbName).collection<User>('users').updateOne({ telegramID: String(telegramID) }, { $push: { orderingData } });
 }
 
 // Delete ordering data from a user
