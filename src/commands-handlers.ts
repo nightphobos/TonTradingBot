@@ -5,11 +5,15 @@ import QRCode from 'qrcode';
 import TelegramBot from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
 import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException } from './utils';
+import { updateUserState } from './ton-connect/mongo';
 
-
-import mongo from './ton-connect/mongo';
 let newConnectRequestListenersMap = new Map<number, () => void>();
 
+
+export async function handleTradeCommnad(msg: TelegramBot.Message): Promise<void> {
+    updateUserState(msg.from?.id ?? 0, 'waitForTraingToken');
+    await bot.sendMessage(msg.chat.id,`Please enter the address of the trading token`);
+}
 export async function handleConnectCommand(msg: TelegramBot.Message): Promise<void> {
     const chatId = msg.chat.id;
     let messageWasDeleted = false;

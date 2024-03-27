@@ -3,11 +3,13 @@ dotenv.config();
 
 import { bot } from './bot';
 import { walletMenuCallbacks } from './connect-wallet-menu';
+import { tradingMenuClick } from './trading-menus';
 import {
     handleConnectCommand,
     handleDisconnectCommand,
     handleSendTXCommand,
-    handleShowMyWalletCommand
+    handleShowMyWalletCommand,
+    handleTradeCommnad
 } from './commands-handlers';
 import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
@@ -26,7 +28,8 @@ let tonWeb = new TonWeb();
 async function main(): Promise<void> {
     await connect();
     const callbacks = {
-        ...walletMenuCallbacks
+        ...walletMenuCallbacks,
+        ...tradingMenuClick
     };
 
     bot.on('callback_query', query => {
@@ -58,6 +61,8 @@ async function main(): Promise<void> {
         }
     });
 
+    bot.onText(/\/trade/, handleTradeCommnad);
+
     bot.onText(/\/connect/, handleConnectCommand);
 
     bot.onText(/\/deposit/, handleSendTXCommand);
@@ -75,6 +80,8 @@ async function main(): Promise<void> {
         if (prevUser){
              message = 'Welcome Back! ' + msg.from?.first_name;
              telegramWalletAddress = prevUser.walletAddress;
+             //set userstate idle
+             updateUserState(userId,'idle');
             }
         else {
             //create a new wallet
@@ -96,7 +103,6 @@ async function main(): Promise<void> {
             await createUser(newUser);
             //save in variable to show
             telegramWalletAddress = address.toString(true,true,false);
-
         }
         bot.sendMessage(
             msg.chat.id,
