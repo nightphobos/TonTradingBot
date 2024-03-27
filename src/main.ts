@@ -9,7 +9,6 @@ import {
     handleSendTXCommand,
     handleShowMyWalletCommand
 } from './commands-handlers';
-import { initRedisClient } from './ton-connect/storage';
 import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
 import TonWeb from 'tonweb';
@@ -19,7 +18,6 @@ const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 
 async function main(): Promise<void> {
-    await initRedisClient();
     await connect();
     const callbacks = {
         ...walletMenuCallbacks
