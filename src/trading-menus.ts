@@ -8,20 +8,13 @@ import { isTelegramUrl } from '@tonconnect/sdk';
 import { addTGReturnStrategy, buildUniversalKeyboard } from './utils';
 import { updateUserState } from './ton-connect/mongo';
 
-export const walletMenuCallbacks = {
-    chose_wallet: onChooseWalletClick,
-    select_wallet: onWalletClick,
-    universal_qr: onOpenUniversalQRClick
+export const tradingMenuClick = {
+    select_wallet: onTradingClick,
+    universal_qr: onOpenTradingQR
 };
-async function onChooseWalletClick(query: CallbackQuery, _: string): Promise<void> {
-    updateUserState(query.from?.id, 'waitForTraingToken');
-    await bot.editMessageText(`Please enter the address of the trading token`, {
-        message_id: query.message?.message_id,
-        chat_id: query.message?.chat.id
-    });
-}
 
-async function onOpenUniversalQRClick(query: CallbackQuery, _: string): Promise<void> {
+
+async function onOpenTradingQR(query: CallbackQuery, _: string): Promise<void> {
     const chatId = query.message!.chat.id;
     const wallets = await getWallets();
 
@@ -44,7 +37,7 @@ async function onOpenUniversalQRClick(query: CallbackQuery, _: string): Promise<
     );
 }
 
-async function onWalletClick(query: CallbackQuery, data: string): Promise<void> {
+async function onTradingClick(query: CallbackQuery, data: string): Promise<void> {
     const chatId = query.message!.chat.id;
     const connector = getConnector(chatId);
 
