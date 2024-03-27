@@ -20,7 +20,7 @@ export interface User {
 }
 
 // MongoDB connection URI
-const uri = 'mongodb+srv://dusanpracaex:6yhn7ujm8ik@cluster0.7lclbo1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0' || process.env.MONGOURI;
+const uri = 'mongodb://127.0.0.1:27017/';
 const dbName = 'TelegramBot';
 
 // Connect to MongoDB
