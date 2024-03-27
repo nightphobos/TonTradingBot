@@ -15,6 +15,12 @@ import express from 'express';
 import TonWeb from 'tonweb';
 import { User, getUserByTelegramID, createUser, connect, updateUserState } from './ton-connect/mongo';
 
+declare global {
+    interface Global {
+        userMessage: string;
+    }
+}
+
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 
@@ -45,16 +51,13 @@ async function main(): Promise<void> {
         callbacks[request.method as keyof typeof callbacks](query, request.data);
     });
 
-    bot.on('message', msg => {
-        const userState = getUserByTelegramID(msg.from?.id);
-        if (userState == 'waitForTraingToken') {
-            updateUserState(msg.from?.id, 'waitForChoosePair');
-            global.userMessage = msg.text;
+    bot.on('message', async msg => {
+        const userId = msg.from?.id ?? 0;
+        const userState: User | null = await getUserByTelegramID(userId);
+        if (userState?.state == 'waitForTraingToken') {
+            updateUserState(userId, 'waitForChoosePair');
+            (global as { userMessage?: string }).userMessage = msg.text;
         }
-        if (msg.text.toString().toLowerCase().indexOf(Hi) === 0) {
-            bot.sendMessage(msg.chat.id,"Hello dear user");
-        }
-
     });
 
     bot.onText(/\/connect/, handleConnectCommand);
@@ -66,8 +69,8 @@ async function main(): Promise<void> {
     bot.onText(/\/my_wallet/, handleShowMyWalletCommand);
 
     bot.onText(/\/start/, async (msg: TelegramBot.Message) => {
-
-        let prevUser = await getUserByTelegramID(String(msg.from?.id));
+        const userId = msg.from?.id ?? 0;
+        let prevUser = await getUserByTelegramID(userId);
         let telegramWalletAddress;
         let message;
 
@@ -90,6 +93,7 @@ async function main(): Promise<void> {
                 telegramID: String(msg.from?.id),
                 walletAddress: address.toString(true,true,false),
                 secretKey: keyPair.secretKey.toString(),
+                state:"idle"
             };
             await createUser(newUser);
             //save in variable to show

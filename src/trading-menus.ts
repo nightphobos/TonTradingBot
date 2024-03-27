@@ -14,7 +14,7 @@ export const walletMenuCallbacks = {
     universal_qr: onOpenUniversalQRClick
 };
 async function onChooseWalletClick(query: CallbackQuery, _: string): Promise<void> {
-    updateUserState(String(query.from.id), 'waitForTraingToken');
+    updateUserState(query.from?.id, 'waitForTraingToken');
     await bot.editMessageText(`Please enter the address of the trading token`, {
         message_id: query.message?.message_id,
         chat_id: query.message?.chat.id
