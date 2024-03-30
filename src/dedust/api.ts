@@ -4,11 +4,14 @@ import { OpenedContract, toNano } from '@ton/core';
 import { Asset, PoolType, ReadinessStatus, JettonRoot } from '@dedust/sdk';
 import axios from 'axios';
 import { mnemonicToWalletKey } from '@ton/crypto';
-import { WalletContract } from 'tonweb/dist/types/contract/wallet/wallet-contract';
+
+import { Pool, createPool, deletePoolsCollection, getPoolWithCaption } from '../ton-connect/mongo';
+import { number } from 'yargs';
+import { bigint } from 'zod';
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 const factory = tonClient.open(Factory.createFromAddress(MAINNET_FACTORY_ADDR));
 
-export interface Asset{
+export interface Jetton{
     type: string,
     address: string,
     name: string,
@@ -16,6 +19,20 @@ export interface Asset{
     image: string
     decimals: string,
     riskScore: string,
+}
+
+export interface PriceResult{
+    pool:{
+        address: string,
+        isStable: false,
+        assets: string[],
+        reserves: string[],
+    },
+    amountIn: bigint,
+    amountOut: bigint,
+    tradeFee: bigint,
+    assetIn: string,
+    assetOut: string
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -126,24 +143,50 @@ export async function fetchDataGet(fetchURL: String) {
     }
 }
 
-export async function fetchPrice(amount: number, from: string, to: string){
-    return axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to });
+export async function fetchPrice(amount: number, from: string, to: string): Promise<[[PriceResult,PriceResult?]]>{
+    return (await axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to })).data;
 } 
-
+function checkHaveTrendingCoin(pool: Pool){
+    if ( //maintain only trending currencies
+        pool.assets[0] == 'native' ||
+        pool.assets[0] == 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
+        pool.assets[0] == 'EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
+        pool.assets[0] == 'EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
+    ) return 0; 
+    else if (
+        pool.assets[1] == 'native' ||
+        pool.assets[1] == 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
+        pool.assets[1] == 'EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
+        pool.assets[1] == 'EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
+    ) return 1;
+    else return -1;
+}
 export async function getPair(){
-    const assets: Asset[] = await fetchDataGet('/assets');
-    let pools: Pool[] = await fetchDataGet('/v2/pools-lite');
-    pools.
-    pools.filter((pool) => (
-            pool.assets[0] == 'native' ||
-            pool.assets[0] == 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' ||
-            pool.assets[0] == 'native' ||
-            pool.assets[0] == 'native' 
-        )
-    );
-    pools.map((pool,index) => {
-        pool.TVL = pool.reserves[0]! *  
+    //delet pools table
+    await deletePoolsCollection();
+    //fetch data
+    const assets: Jetton[] = await fetchDataGet('/assets');
+    const extPrice: {symbol:string, price: number}[] = await fetchDataGet('/prices');
+    //TON price
+    const nativePrice = extPrice.filter( (p:any) => p.symbol == 'TON' )[0]!.price;
+    let pools: Pool[] = await fetchDataGet('/pools-lite');
+    pools.filter( (pool) => checkHaveTrendingCoin(pool) + 1);
+
+    // integrate caption and price into Pools
+    pools.map(async (pool) => {
+        pool.TVL = 0;
+        const targetCoinId = 1 - checkHaveTrendingCoin(pool);
+        for(let i = 0; i < 2 ; i ++){
+            // target coin's price rated in TON
+            const [[pricePost]] = await fetchPrice(1000000000,'native', pool.assets[i]!);
+
+            pool.prices[i] = pricePost.amountOut * BigInt( nativePrice ); // price in nano USD
+            pool.caption[i] = assets.filter( asset => asset.address == pool.assets[i])[0]!.symbol; //init caption
+            pool.TVL += Number((pool.prices[i]! * pool.reserves[i]!) * ( pool.caption[i]?.indexOf('USD') ? BigInt(1000) : BigInt(1)) / BigInt(1000000000));
+        }
+        await createPool(pool);
     });
+    
 } 
 
 async function main() {
@@ -165,3 +208,4 @@ async function main() {
     //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
 }
+getPair();

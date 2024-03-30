@@ -8,7 +8,7 @@ import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutExceptio
 import { createUser, getUserByTelegramID, updateUserState,User } from './ton-connect/mongo';
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
-import { fetchDataGet } from './dedust/api';
+import { fetchDataGet, Jetton } from './dedust/api';
 let tonWeb = new TonWeb();
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
@@ -16,8 +16,6 @@ let newConnectRequestListenersMap = new Map<number, () => void>();
 export const commandCallback = {
     tradingCallback:handleTradingCallback
 }
-
-
 
 async function handleTradingCallback (query: CallbackQuery){
 
@@ -28,6 +26,7 @@ async function handleTradingCallback (query: CallbackQuery){
     updateUserState(query.from!.id, user!.state);
 
     //fetch assets from dedust API
+    const assets: Jetton[] = await fetchDataGet('/assets');
     const rows = Math.ceil(assets.length / 4);
 
     let keyboardArray: InlineKeyboardButton[][] = []; // Type annotation for keyboardArray

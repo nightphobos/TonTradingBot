@@ -34,12 +34,12 @@ export interface User {
     lt: string,
     totalSupply: number,
     type: string,
-    tradeFee: number,
-    prices: number[],
+    tradeFee: bigint,
+    prices: bigint[],
     assets: string[],
-    reserves: number[],
-    fees: number[],
-    volume: number[],
+    reserves: bigint[],
+    fees: bigint[],
+    volume: bigint[],
     TVL: number,
 }
 
@@ -111,21 +111,29 @@ export async function getUserByTelegramIDWithOrderingData(
 }
 
 // Create a new pool
-export async function createPool(user: Pool): Promise<ObjectId> {
+export async function createPool(pool: Pool): Promise<ObjectId> {
     const db = await connect();
-    const result = await db.db(dbName).collection<Pool>('pools').insertOne(user);
+    const result = await db.db(dbName).collection<Pool>('pools').insertOne(pool);
     return result.insertedId;
 }
 
 // Get a pool by caption
 export async function getPoolWithCaption(
     caption: string[]
-): Promise<User | null> {
+): Promise<Pool | null> {
     const db = await connect();
     return db.db(dbName).collection<Pool>('pools').findOne({caption});
 }
 
 
+//update user states
+export async function deletePoolsCollection(): Promise<void> {
+    const db = await connect();
+    await db
+        .db(dbName)
+        .collection<Pool>('pools')
+        .drop();
+}
 // // Example usage
 // export async function main() {
 //     // Retrieve a user by Telegram ID with ordering data
