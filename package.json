@@ -22,7 +22,7 @@
     "mongoose": "^8.2.3",
     "node-telegram-bot-api": "^0.61.0",
     "qrcode": "^1.5.1",
-    "redis": "^4.6.5",
+    "redis": "^4.6.13",
     "tonweb": "^0.0.64"
   },
   "devDependencies": {
