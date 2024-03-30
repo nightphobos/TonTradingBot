@@ -81,6 +81,7 @@ Commands list:
 }
 
 export async function handleConnectCommand(msg: TelegramBot.Message): Promise<void> {
+    console.log('connect!!');
     const chatId = msg.chat.id;
     let messageWasDeleted = false;
 
@@ -119,7 +120,6 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
             newConnectRequestListenersMap.delete(chatId);
         }
     });
-
     const wallets = await getWallets();
 
     const link = connector.connect(wallets);

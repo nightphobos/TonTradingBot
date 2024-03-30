@@ -51,7 +51,6 @@ export async function buildUniversalKeyboard(
               process.env.TELEGRAM_BOT_LINK!
           )
         : undefined;
-
     const keyboard = [
         {
             text: 'Choose a Wallet',
