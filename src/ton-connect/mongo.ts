@@ -15,7 +15,14 @@ export interface User {
     telegramID: string;
     walletAddress: string;
     secretKey: string;
-    state: string;
+    state: {
+        state: string;
+        fromJetton: string;
+        toJetton: string;
+        amount: string;
+        price: number; // toJetton x amount = $fromJetton
+        isBuy: boolean;
+    };
     orderingData?: OrderingData[];
 }
 
@@ -30,7 +37,7 @@ export async function connect(): Promise<MongoClient> {
     return client;
 }
 //update user states
-export async function updateUserState(telegramID: number, newState: string): Promise<void> {
+export async function updateUserState(telegramID: number, newState: User['state']): Promise<void> {
     let telegramIDString = String(telegramID);
     const db = await connect();
     await db
@@ -49,7 +56,10 @@ export async function createUser(user: User): Promise<ObjectId> {
 export async function getUserByTelegramID(telegramID: number): Promise<User | null> {
 
     const db = await connect();
-    return db.db(dbName).collection<User>('users').findOne({ telegramID: String(telegramID) });
+    return db
+        .db(dbName)
+        .collection<User>('users')
+        .findOne({ telegramID: String(telegramID) });
 }
 
 // Add ordering data to a user
@@ -58,7 +68,10 @@ export async function addOrderingDataToUser(
     orderingData: OrderingData
 ): Promise<void> {
     const db = await connect();
-    await db.db(dbName).collection<User>('users').updateOne({ telegramID: String(telegramID) }, { $push: { orderingData } });
+    await db
+        .db(dbName)
+        .collection<User>('users')
+        .updateOne({ telegramID: String(telegramID) }, { $push: { orderingData } });
 }
 
 // Delete ordering data from a user
@@ -67,11 +80,16 @@ export async function deleteOrderingDataFromUser(
     orderingDataId: ObjectId
 ): Promise<void> {
     const db = await connect();
-    await db.db(dbName).collection<User>('users').updateOne({ telegramID }, { $pull: { orderingData: { _id: orderingDataId } } });
+    await db
+        .db(dbName)
+        .collection<User>('users')
+        .updateOne({ telegramID }, { $pull: { orderingData: { _id: orderingDataId } } });
 }
 
 // Get a user by Telegram ID with ordering data
-export async function getUserByTelegramIDWithOrderingData(telegramID: string): Promise<User | null> {
+export async function getUserByTelegramIDWithOrderingData(
+    telegramID: string
+): Promise<User | null> {
     const db = await connect();
     return db.db(dbName).collection<User>('users').findOne({ telegramID });
 }

@@ -2,18 +2,84 @@ import { CHAIN, isTelegramUrl, toUserFriendlyAddress, UserRejectsError } from '@
 import { bot } from './bot';
 import { getWallets, getWalletInfo } from './ton-connect/wallets';
 import QRCode from 'qrcode';
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot, { User } from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
 import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException } from './utils';
-import { updateUserState } from './ton-connect/mongo';
+import { createUser, getUserByTelegramID, updateUserState } from './ton-connect/mongo';
+import TonWeb from 'tonweb';
+import nacl from 'tweetnacl';
+let tonWeb = new TonWeb();
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
 
+export async function handleStartCommand(msg: TelegramBot.Message): Promise<void> {
+    // const app = express();
+    // app.use(express.json());
+    // app.listen(10000, () => {
+    //     console.log(`Express server is listening on 10000`);
+    // }
+    const userId = msg.from?.id ?? 0;
+    let prevUser = await getUserByTelegramID(userId);
+    let telegramWalletAddress;
+    let message;
 
-export async function handleTradeCommnad(msg: TelegramBot.Message): Promise<void> {
-    updateUserState(msg.from?.id ?? 0, 'waitForTraingToken');
-    await bot.sendMessage(msg.chat.id,`Please enter the address of the trading token`);
+    if (prevUser) {
+        // eslint-disable-next-line unused-imports/no-unused-vars
+        message = 'Welcome Back! ' + msg.from?.first_name;
+        telegramWalletAddress = prevUser.walletAddress;
+        //set userstate idle
+        updateUserState(userId, {
+            state: 'idle',
+            fromJetton: '',
+            toJetton: '',
+            amount: '',
+            price: 0,
+            isBuy: false
+        });
+    } else {
+        //create a new wallet
+        const keyPair = nacl.sign.keyPair();
+        let wallet = tonWeb.wallet.create({ publicKey: keyPair.publicKey, wc: 0 });
+        const address = await wallet.getAddress();
+        const seqno = await wallet.methods.seqno().call();
+        const deploy = wallet.deploy(keyPair.secretKey);
+        const deployFee = await deploy.estimateFee();
+        const deploySended = await deploy.send();
+        const deployQuery = await deploy.getQuery();
+        //save in db
+        await createUser({
+            telegramID: String(msg.from?.id),
+            walletAddress: address.toString(true, true, false),
+            secretKey: keyPair.secretKey.toString(),
+            state: {
+                state: 'idle',
+                fromJetton: '',
+                toJetton: '',
+                amount: '',
+                price: 0,
+                isBuy: false
+            }
+        });
+        //save in variable to show
+        telegramWalletAddress = address.toString(true, true, false);
+    }
+
+    //send message
+    bot.sendMessage(
+        msg.chat.id,
+        `
+Your telegram Wallet Address : ${telegramWalletAddress}
+Commands list: 
+/trade - Start trading
+/connect - Connect your wallet
+/my_wallet - Show connected wallet
+/deposit - Deposit jettons to telegram wallet 
+/withdraw - Withdraw jettons from telegram wallet
+/disconnect - Disconnect from the wallet
+`
+    );
 }
+
 export async function handleConnectCommand(msg: TelegramBot.Message): Promise<void> {
     const chatId = msg.chat.id;
     let messageWasDeleted = false;
@@ -35,7 +101,7 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
             chatId,
             `You have already connect ${connectedName} wallet\nYour address: ${toUserFriendlyAddress(
                 connector.wallet!.account.address,
-                connector.wallet!.account.chain === CHAIN.TESTNET
+                connector.wallet!.account.chain === CHAIN.MAINNET
             )}\n\n Disconnect wallet firstly to connect a new one`
         );
 

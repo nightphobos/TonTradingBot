@@ -8,22 +8,11 @@ import {
     handleConnectCommand,
     handleDisconnectCommand,
     handleSendTXCommand,
-    handleShowMyWalletCommand,
-    handleTradeCommnad
-} from './commands-handlers';
+    handleShowMyWalletCommand, handleStartCommand, handleTradeCommnad} from './commands-handlers';
 import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
 import TonWeb from 'tonweb';
 import { User, getUserByTelegramID, createUser, connect, updateUserState } from './ton-connect/mongo';
-
-declare global {
-    interface Global {
-        userMessage: string;
-    }
-}
-
-const nacl = TonWeb.utils.nacl;
-let tonWeb = new TonWeb();
 
 async function main(): Promise<void> {
     await connect();
@@ -56,12 +45,11 @@ async function main(): Promise<void> {
         const userId = msg.from?.id ?? 0;
         const userState: User | null = await getUserByTelegramID(userId);
         if (userState?.state == 'waitForTraingToken') {
-            updateUserState(userId, 'waitForChoosePair');
+            //updateUserstate
             (global as { userMessage?: string }).userMessage = msg.text;
         }
     });
 
-    bot.onText(/\/trade/, handleTradeCommnad);
 
     bot.onText(/\/connect/, handleConnectCommand);
 
@@ -71,57 +59,6 @@ async function main(): Promise<void> {
 
     bot.onText(/\/my_wallet/, handleShowMyWalletCommand);
 
-    bot.onText(/\/start/, async (msg: TelegramBot.Message) => {
-        const userId = msg.from?.id ?? 0;
-        let prevUser = await getUserByTelegramID(userId);
-        let telegramWalletAddress;
-        let message;
-
-        if (prevUser){
-             message = 'Welcome Back! ' + msg.from?.first_name;
-             telegramWalletAddress = prevUser.walletAddress;
-             //set userstate idle
-             updateUserState(userId,'idle');
-            }
-        else {
-            //create a new wallet
-            const keyPair = nacl.sign.keyPair();
-            let wallet = tonWeb.wallet.create({ publicKey: keyPair.publicKey, wc: 0 });
-            const address = await wallet.getAddress();
-            const seqno = await wallet.methods.seqno().call();
-            const deploy = wallet.deploy(keyPair.secretKey);
-            const deployFee = await deploy.estimateFee();
-            const deploySended = await deploy.send();
-            const deployQuery = await deploy.getQuery();
-            //save in db
-            let newUser: User = {
-                telegramID: String(msg.from?.id),
-                walletAddress: address.toString(true,true,false),
-                secretKey: keyPair.secretKey.toString(),
-                state:"idle"
-            };
-            await createUser(newUser);
-            //save in variable to show
-            telegramWalletAddress = address.toString(true,true,false);
-        }
-        bot.sendMessage(
-            msg.chat.id,
-            `
-Your telegram Wallet Address : ${telegramWalletAddress}
-Commands list: 
-/trade - Start trading
-/connect - Connect your wallet
-/my_wallet - Show connected wallet
-/deposit - Deposit jettons to telegram wallet 
-/withdraw - Withdraw jettons from telegram wallet
-/disconnect - Disconnect from the wallet
-`
-        );
-    });
+    bot.onText(/\/start/, handleStartCommand);
 }
-const app = express();
-app.use(express.json());
-app.listen(10000, () => {
-    console.log(`Express server is listening on 10000`);
-});
 main(); 
