@@ -2,33 +2,27 @@ import { CHAIN, isTelegramUrl, toUserFriendlyAddress, UserRejectsError } from '@
 import { bot } from './bot';
 import { getWallets, getWalletInfo } from './ton-connect/wallets';
 import QRCode from 'qrcode';
-import TelegramBot, { User } from 'node-telegram-bot-api';
+import TelegramBot from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
 import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException } from './utils';
-import { createUser, getUserByTelegramID, updateUserState } from './ton-connect/mongo';
+import { createUser, getUserByTelegramID, updateUserState,User } from './ton-connect/mongo';
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
 let tonWeb = new TonWeb();
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
 
-export async function handleStartCommand(msg: TelegramBot.Message): Promise<void> {
-    // const app = express();
-    // app.use(express.json());
-    // app.listen(10000, () => {
-    //     console.log(`Express server is listening on 10000`);
-    // }
+export async function handleStartCommand (msg: TelegramBot.Message)  {
     const userId = msg.from?.id ?? 0;
     let prevUser = await getUserByTelegramID(userId);
     let telegramWalletAddress;
     let message;
 
-    if (prevUser) {
-        // eslint-disable-next-line unused-imports/no-unused-vars
-        message = 'Welcome Back! ' + msg.from?.first_name;
-        telegramWalletAddress = prevUser.walletAddress;
-        //set userstate idle
-        updateUserState(userId, {
+    if (prevUser){
+         message = 'Welcome Back! ' + msg.from?.first_name;
+         telegramWalletAddress = prevUser.walletAddress;
+         //set userstate idle
+         updateUserState(userId,{
             state: 'idle',
             fromJetton: '',
             toJetton: '',
@@ -36,7 +30,8 @@ export async function handleStartCommand(msg: TelegramBot.Message): Promise<void
             price: 0,
             isBuy: false
         });
-    } else {
+        }
+    else {
         //create a new wallet
         const keyPair = nacl.sign.keyPair();
         let wallet = tonWeb.wallet.create({ publicKey: keyPair.publicKey, wc: 0 });
@@ -47,11 +42,11 @@ export async function handleStartCommand(msg: TelegramBot.Message): Promise<void
         const deploySended = await deploy.send();
         const deployQuery = await deploy.getQuery();
         //save in db
-        await createUser({
+        let newUser: User = {
             telegramID: String(msg.from?.id),
-            walletAddress: address.toString(true, true, false),
+            walletAddress: address.toString(true,true,false),
             secretKey: keyPair.secretKey.toString(),
-            state: {
+            state:{
                 state: 'idle',
                 fromJetton: '',
                 toJetton: '',
@@ -59,24 +54,33 @@ export async function handleStartCommand(msg: TelegramBot.Message): Promise<void
                 price: 0,
                 isBuy: false
             }
-        });
+        };
+        await createUser(newUser);
         //save in variable to show
-        telegramWalletAddress = address.toString(true, true, false);
+        telegramWalletAddress = address.toString(true,true,false);
     }
-
-    //send message
     bot.sendMessage(
         msg.chat.id,
-        `
-Your telegram Wallet Address : ${telegramWalletAddress}
-Commands list: 
-/trade - Start trading
-/connect - Connect your wallet
-/my_wallet - Show connected wallet
-/deposit - Deposit jettons to telegram wallet 
-/withdraw - Withdraw jettons from telegram wallet
-/disconnect - Disconnect from the wallet
-`
+        `🏆<b>RewardBot</b>🏆
+👏Welcome to <b>RewardBot</b>.
+<b>RewardBot</b> can provide you with a good trading environment <b>Anytime</b>, <b>Anywhere</b>, <b>Anyone</b> 
+
+Your RewardBot Wallet Address is
+<code>${telegramWalletAddress}</code>
+
+Please Connect Wallet and Start Trading.
+`,{
+reply_markup:{
+    inline_keyboard:[
+        [{text:'Start Trading',web_app:{url:'https://web.ton-rocket.com/trade'}}],
+        [{text:'Connect Wallet',callback_data:'walletConnect'}],
+        [{text:'My wallet', callback_data:'myWallet'}],
+    //    [{text:'Deposit', callback_data:'my_wallet'},{text:'Withdraw', callback_data:'my_wallet'}],
+        [{text:'Disconnect Wallet', callback_data:'disConnect'}],
+    ]
+},
+parse_mode:'HTML'
+}
     );
 }
 
