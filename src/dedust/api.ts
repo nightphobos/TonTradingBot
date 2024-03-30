@@ -143,8 +143,8 @@ export async function fetchDataGet(fetchURL: String) {
     }
 }
 
-export async function fetchPrice(amount: number, from: string, to: string): Promise<[[PriceResult,PriceResult?]]>{
-    return (await axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to })).data;
+export async function fetchPrice(amount: number, from: string, to: string){
+    axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to }).then(lp => console.log(lp.data));
 } 
 function checkHaveTrendingCoin(pool: Pool){
     if ( //maintain only trending currencies
@@ -178,11 +178,11 @@ export async function getPair(){
         const targetCoinId = 1 - checkHaveTrendingCoin(pool);
         for(let i = 0; i < 2 ; i ++){
             // target coin's price rated in TON
-            const [[pricePost]] = await fetchPrice(1000000000,'native', pool.assets[i]!);
-
-            pool.prices[i] = pricePost.amountOut * BigInt( nativePrice ); // price in nano USD
-            pool.caption[i] = assets.filter( asset => asset.address == pool.assets[i])[0]!.symbol; //init caption
-            pool.TVL += Number((pool.prices[i]! * pool.reserves[i]!) * ( pool.caption[i]?.indexOf('USD') ? BigInt(1000) : BigInt(1)) / BigInt(1000000000));
+            const pricePost = await fetchPrice(1000000000,'native', pool.assets[i]!);
+            console.log(pricePost);
+            // pool.prices[i] = pricePost.amountOut * BigInt( nativePrice ); // price in nano USD
+            // pool.caption[i] = assets.filter( asset => asset.address == pool.assets[i])[0]!.symbol; //init caption
+            // pool.TVL += Number((pool.prices[i]! * pool.reserves[i]!) * ( pool.caption[i]?.indexOf('USD') ? BigInt(1000) : BigInt(1)) / BigInt(1000000000));
         }
         await createPool(pool);
     });
@@ -208,4 +208,4 @@ async function main() {
     //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
 }
-getPair();
+fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
