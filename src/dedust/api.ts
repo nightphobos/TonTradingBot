@@ -8,6 +8,16 @@ import { WalletContract } from 'tonweb/dist/types/contract/wallet/wallet-contrac
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 const factory = tonClient.open(Factory.createFromAddress(MAINNET_FACTORY_ADDR));
 
+export interface Asset{
+    type: string,
+    address: string,
+    name: string,
+    symbol: string,
+    image: string
+    decimals: string,
+    riskScore: string,
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function ton_to_Jetton(sender: Sender, jettonAddress: Address, amountIn: number) {
     const tonVault = tonClient.open(await factory.getNativeVault());
@@ -102,7 +112,7 @@ export async function jetton_to_Jetton(
 }
 
 //eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export async function fetchData(fetchURL: String) {
+export async function fetchDataGet(fetchURL: String) {
     try {
         const response = await axios.get('https://api.dedust.io/v2' + fetchURL, {
             headers: {
@@ -110,11 +120,31 @@ export async function fetchData(fetchURL: String) {
             }
         });
         console.log('Fetch Success => https://api.dedust.io/v2' + fetchURL); // Output the response data
-        return response;
+        return response.data;
     } catch (error) {
         console.error('Error fetching data:', error);
     }
 }
+
+export async function fetchPrice(amount: number, from: string, to: string){
+    return axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to });
+} 
+
+export async function getPair(){
+    const assets: Asset[] = await fetchDataGet('/assets');
+    let pools: Pool[] = await fetchDataGet('/v2/pools-lite');
+    pools.
+    pools.filter((pool) => (
+            pool.assets[0] == 'native' ||
+            pool.assets[0] == 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' ||
+            pool.assets[0] == 'native' ||
+            pool.assets[0] == 'native' 
+        )
+    );
+    pools.map((pool,index) => {
+        pool.TVL = pool.reserves[0]! *  
+    });
+} 
 
 async function main() {
                                                                                                                                                     const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage,cricket`
@@ -135,4 +165,3 @@ async function main() {
     //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
 }
-

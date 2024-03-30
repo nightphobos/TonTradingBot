@@ -2,17 +2,54 @@ import { CHAIN, isTelegramUrl, toUserFriendlyAddress, UserRejectsError } from '@
 import { bot } from './bot';
 import { getWallets, getWalletInfo } from './ton-connect/wallets';
 import QRCode from 'qrcode';
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot, { CallbackQuery, InlineKeyboardButton } from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
 import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException } from './utils';
 import { createUser, getUserByTelegramID, updateUserState,User } from './ton-connect/mongo';
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
+import { fetchDataGet } from './dedust/api';
 let tonWeb = new TonWeb();
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
 
+export const commandCallback = {
+    tradingCallback:handleTradingCallback
+}
+
+
+
+async function handleTradingCallback (query: CallbackQuery){
+
+    //update user state string
+    
+    let user = await getUserByTelegramID(query.from!.id);
+    user!.state.state = 'trading';
+    updateUserState(query.from!.id, user!.state);
+
+    //fetch assets from dedust API
+    const rows = Math.ceil(assets.length / 4);
+
+    let keyboardArray: InlineKeyboardButton[][] = []; // Type annotation for keyboardArray
+    const filteredAssets = assets.filter(asset => asset !== undefined);
+    filteredAssets.map((asset, index) => {
+        if (!!!keyboardArray[Math.floor(index / 4)]) keyboardArray[Math.floor(index / 4)] = [];
+        keyboardArray[Math.floor(index / 4)]![index % 4] = {text: asset.symbol, callback_data: `symbol-${asset.symbol}`};
+    });
+    
+    await bot.editMessageReplyMarkup(
+        { inline_keyboard: keyboardArray },
+        {
+            message_id: query.message?.message_id,
+            chat_id: query.message?.chat.id
+        }
+    );
+    await bot.sendMessage(query.message!.chat.id,'First select jetton to sell');
+}
+
 export async function handleStartCommand (msg: TelegramBot.Message)  {
+    
+    //update / create user info
     const userId = msg.from?.id ?? 0;
     let prevUser = await getUserByTelegramID(userId);
     let telegramWalletAddress;
@@ -26,7 +63,7 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
             state: 'idle',
             fromJetton: '',
             toJetton: '',
-            amount: '',
+            amount: 0,
             price: 0,
             isBuy: false
         });
@@ -43,14 +80,15 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
         const deployQuery = await deploy.getQuery();
         //save in db
         let newUser: User = {
-            telegramID: String(msg.from?.id),
+            telegramID: msg.from!.id,
             walletAddress: address.toString(true,true,false),
             secretKey: keyPair.secretKey.toString(),
+            publicKey: keyPair.publicKey.toString(),
             state:{
                 state: 'idle',
                 fromJetton: '',
                 toJetton: '',
-                amount: '',
+                amount: 0,
                 price: 0,
                 isBuy: false
             }
@@ -72,7 +110,9 @@ Please Connect Wallet and Start Trading.
 `,{
 reply_markup:{
     inline_keyboard:[
-        [{text:'Start Trading',web_app:{url:'https://web.ton-rocket.com/trade'}}],
+        [{text:'Start Trading',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
+            method: 'tradingCallback'
+        })}],
         [{text:'Connect Wallet',callback_data:'walletConnect'}],
         [{text:'My wallet', callback_data:'myWallet'}],
     //    [{text:'Deposit', callback_data:'my_wallet'},{text:'Withdraw', callback_data:'my_wallet'}],
