@@ -14,7 +14,6 @@ export const walletMenuCallbacks = {
 };
 async function onChooseWalletClick(query: CallbackQuery, _: string): Promise<void> {
     const wallets = await getWallets();
-
     await bot.editMessageReplyMarkup(
         {
             inline_keyboard: [
@@ -65,7 +64,6 @@ async function onOpenUniversalQRClick(query: CallbackQuery, _: string): Promise<
 async function onWalletClick(query: CallbackQuery, data: string): Promise<void> {
     const chatId = query.message!.chat.id;
     const connector = getConnector(chatId);
-
     const selectedWallet = await getWalletInfo(data);
     if (!selectedWallet) {
         return;
@@ -84,7 +82,7 @@ async function onWalletClick(query: CallbackQuery, data: string): Promise<void> 
     }
 
     await editQR(query.message!, qrLink);
-
+    
     await bot.editMessageReplyMarkup(
         {
             inline_keyboard: [

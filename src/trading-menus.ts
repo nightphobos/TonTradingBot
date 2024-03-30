@@ -15,6 +15,7 @@ export const tradingMenuClick = {
 
 
 async function onOpenTradingQR(query: CallbackQuery, _: string): Promise<void> {
+    
     const chatId = query.message!.chat.id;
     const wallets = await getWallets();
 

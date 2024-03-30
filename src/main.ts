@@ -12,10 +12,11 @@ import {
     handleTradeCommnad
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot, { CallbackQuery } from 'node-telegram-bot-api';
 import express from 'express';
 import TonWeb from 'tonweb';
 import { User, getUserByTelegramID, createUser, connect, updateUserState } from './ton-connect/mongo';
+import { addTGReturnStrategy } from './utils';
 
 declare global {
     interface Global {
@@ -31,16 +32,29 @@ async function main(): Promise<void> {
     await connect();
     const callbacks = {
         ...walletMenuCallbacks,
-        ...tradingMenuClick
+        ...tradingMenuClick,
     };
 
     bot.on('callback_query', query => {
         if (!query.data) {
             return;
         }
-
+        switch (query.data) {
+            case 'walletConnect':
+                handleConnectCommand(query.message!);
+                return;
+            case 'myWallet':
+                handleShowMyWalletCommand(query.message!);
+                return;
+            case 'disConnect':
+                handleDisconnectCommand(query.message!);
+                return;
+            default:
+                break;
+        }
+        
         let request: { method: string; data: string };
-
+        
         try {
             request = JSON.parse(query.data);
         } catch {
@@ -53,7 +67,7 @@ async function main(): Promise<void> {
 
         callbacks[request.method as keyof typeof callbacks](query, request.data);
     });
-
+    
     bot.on('message', async msg => {
         const userId = msg.from?.id ?? 0;
         const userState: User | null = await getUserByTelegramID(userId);
@@ -108,22 +122,28 @@ async function main(): Promise<void> {
         }
         bot.sendMessage(
             msg.chat.id,
-            `
-Your telegram Wallet Address : ${telegramWalletAddress}
-Commands list: 
-/trade - Start trading
-/connect - Connect your wallet
-/my_wallet - Show connected wallet
-/deposit - Deposit jettons to telegram wallet 
-/withdraw - Withdraw jettons from telegram wallet
-/disconnect - Disconnect from the wallet
-`
+            `🏆<b>RewardBot</b>🏆
+👏Welcome to <b>RewardBot</b>.
+<b>RewardBot</b> can provide you with a good trading environment <b>Anytime</b>, <b>Anywhere</b>, <b>Anyone</b> 
+
+Your RewardBot Wallet Address is
+<code>${telegramWalletAddress}</code>
+
+Please Connect Wallet and Start Trading.
+`,{
+    reply_markup:{
+        inline_keyboard:[
+            [{text:'Start Trading',web_app:{url:'https://web.ton-rocket.com/trade'}}],
+            [{text:'Connect Wallet',callback_data:'walletConnect'}],
+            [{text:'My wallet', callback_data:'myWallet'}],
+        //    [{text:'Deposit', callback_data:'my_wallet'},{text:'Withdraw', callback_data:'my_wallet'}],
+            [{text:'Disconnect Wallet', callback_data:'disConnect'}],
+        ]
+    },
+    parse_mode:'HTML'
+}
         );
     });
 }
-const app = express();
-app.use(express.json());
-app.listen(10000, () => {
-    console.log(`Express server is listening on 10000`);
-});
+
 main(); 

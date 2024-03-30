@@ -15,6 +15,7 @@ export async function handleTradeCommnad(msg: TelegramBot.Message): Promise<void
     await bot.sendMessage(msg.chat.id,`Please enter the address of the trading token`);
 }
 export async function handleConnectCommand(msg: TelegramBot.Message): Promise<void> {
+    console.log('connect!!');
     const chatId = msg.chat.id;
     let messageWasDeleted = false;
 
@@ -53,7 +54,6 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
             newConnectRequestListenersMap.delete(chatId);
         }
     });
-
     const wallets = await getWallets();
 
     const link = connector.connect(wallets);
