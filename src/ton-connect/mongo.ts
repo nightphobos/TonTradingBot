@@ -34,11 +34,11 @@ export interface User {
     lt: string,
     totalSupply: number,
     type: string,
-    tradeFee: bigint,
-    prices: bigint[],
+    tradeFee: number,
+    prices: number[],
     assets: string[],
-    reserves: bigint[],
-    fees: bigint[],
+    reserves: number[],
+    fees: number[],
     volume: bigint[],
     TVL: number,
 }
@@ -110,12 +110,30 @@ export async function getUserByTelegramIDWithOrderingData(
     return db.db(dbName).collection<User>('users').findOne({ telegramID });
 }
 
+async function executeWithTimeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(new Error('Operation timed out'));
+        }, timeout);
+
+        promise.then((result) => {
+            clearTimeout(timer);
+            resolve(result);
+        }).catch((error) => {
+            clearTimeout(timer);
+            reject(error);
+        });
+    });
+}
+
 // Create a new pool
-export async function createPool(pool: Pool): Promise<ObjectId> {
+export async function createPool(pool: Pool, timeout: number): Promise<ObjectId> {
     const db = await connect();
-    const result = await db.db(dbName).collection<Pool>('pools').insertOne(pool);
+    const promise = db.db(dbName).collection<Pool>('pools').insertOne(pool);
+    const result = await executeWithTimeout(promise, timeout);
     return result.insertedId;
 }
+
 
 // Get a pool by caption
 export async function getPoolWithCaption(

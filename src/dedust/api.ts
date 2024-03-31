@@ -144,50 +144,78 @@ export async function fetchDataGet(fetchURL: String) {
 }
 
 export async function fetchPrice(amount: number, from: string, to: string){
-    axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to }).then(lp => console.log(lp.data));
+    if(from == to) return amount;
+    //console.log({ amount, from, to });
+    if(from.indexOf('jetton:') + 1)
+        from = 'jetton:' + Address.parse(from.replace('jetton:','')).toRawString();
+    if(to.indexOf('jetton:') + 1)
+        to = 'jetton:' + Address.parse(to.replace('jetton:','')).toRawString();
+    const res = (await axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to },{timeout:10000})).data;
+    return res[0][res[0].length - 1].amountOut ;
 } 
 function checkHaveTrendingCoin(pool: Pool){
     if ( //maintain only trending currencies
         pool.assets[0] == 'native' ||
-        pool.assets[0] == 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
-        pool.assets[0] == 'EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
-        pool.assets[0] == 'EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
+        pool.assets[0] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
+        pool.assets[0] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
+        pool.assets[0] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
     ) return 0; 
     else if (
         pool.assets[1] == 'native' ||
-        pool.assets[1] == 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
-        pool.assets[1] == 'EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
-        pool.assets[1] == 'EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
+        pool.assets[1] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
+        pool.assets[1] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
+        pool.assets[1] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
     ) return 1;
     else return -1;
 }
-export async function getPair(){
-    //delet pools table
+export async function getPair() {
+    let counter = 0;
+    //delete pools table
     await deletePoolsCollection();
     //fetch data
     const assets: Jetton[] = await fetchDataGet('/assets');
     const extPrice: {symbol:string, price: number}[] = await fetchDataGet('/prices');
     //TON price
-    const nativePrice = extPrice.filter( (p:any) => p.symbol == 'TON' )[0]!.price;
+    const nativePrice = extPrice.find(p => p.symbol === 'USDT')?.price || 0;
     let pools: Pool[] = await fetchDataGet('/pools-lite');
-    pools.filter( (pool) => checkHaveTrendingCoin(pool) + 1);
-
-    // integrate caption and price into Pools
-    pools.map(async (pool) => {
+    pools = pools.filter(pool => checkHaveTrendingCoin(pool) >= 0 && pool.volume[0]! > 0);
+    
+    await Promise.all(pools.map(async (pool, index) => {
+        pool.caption = ['', ''];
+        pool.prices = [0, 0];
         pool.TVL = 0;
         const targetCoinId = 1 - checkHaveTrendingCoin(pool);
-        for(let i = 0; i < 2 ; i ++){
-            // target coin's price rated in TON
-            const pricePost = await fetchPrice(1000000000,'native', pool.assets[i]!);
-            console.log(pricePost);
-            // pool.prices[i] = pricePost.amountOut * BigInt( nativePrice ); // price in nano USD
-            // pool.caption[i] = assets.filter( asset => asset.address == pool.assets[i])[0]!.symbol; //init caption
-            // pool.TVL += Number((pool.prices[i]! * pool.reserves[i]!) * ( pool.caption[i]?.indexOf('USD') ? BigInt(1000) : BigInt(1)) / BigInt(1000000000));
+        let flag = true;
+        for (let i = 0; i < 2; i++) {
+            try {
+                const pricePost = await fetchPrice(1000000, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA', pool.assets[i]!);
+                pool.prices[i] = pricePost * nativePrice / 1000000000; // price in USD
+                const filteredAssets = assets.filter(asset => asset.address === pool.assets[i]?.replace('jetton:', ''));
+                if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
+                    if (pool.assets[i] === 'native') pool.caption[i] = 'TON';
+                    else pool.caption[i] = filteredAssets[0]!.symbol; //init caption
+                    pool.TVL += Number((pool.prices[i]! * pool.reserves[i]!) * (pool.caption[i]?.indexOf('USD') ? 1000 : 1));
+                } else {
+                    flag = false;
+                }
+            } catch (error) {
+                console.log(`Error in async operation for pool ${index}, asset ${i}:`, error);
+                counter++;
+                continue;
+            }
         }
-        await createPool(pool);
-    });
+        counter++;
+        if (flag) {
+            try {
+                const poolId = await createPool(pool, 5000); // 5000 milliseconds (5 seconds) timeout
+            } catch (error) {
+                console.error('Error creating pool:', error);
+            }
+        }
+    }));
     
-} 
+    return;
+}
 
 async function main() {
                                                                                                                                                     const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage,cricket`
@@ -208,4 +236,4 @@ async function main() {
     //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
 }
-fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
+//fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
