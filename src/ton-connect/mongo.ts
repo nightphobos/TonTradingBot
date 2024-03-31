@@ -3,11 +3,11 @@ import { MongoClient, ObjectId, Collection } from 'mongodb';
 // Define interfaces
 export interface OrderingData {
     _id?: ObjectId;
+    jettons: string[];
+    mainCoin: number;
     amount: number;
-    fromToken: string;
-    toToken: string;
-    limitPrice: number;
-    maxMin: number;
+    price: number; // toJetton x amount = $fromJetton
+    isBuy: boolean;
 }
 
 export interface User {
@@ -18,8 +18,8 @@ export interface User {
     publicKey:string;
     state: {
         state: string;
-        fromJetton: string;
-        toJetton: string;
+        jettons: string[];
+        mainCoin: number;
         amount: number;
         price: number; // toJetton x amount = $fromJetton
         isBuy: boolean;
@@ -41,6 +41,7 @@ export interface User {
     fees: number[],
     volume: bigint[],
     TVL: number,
+    main:number,
 }
 
 // MongoDB connection URI
@@ -143,6 +144,12 @@ export async function getPoolWithCaption(
     return db.db(dbName).collection<Pool>('pools').findOne({caption});
 }
 
+// Get a pool by caption
+export async function getPools(
+): Promise<Pool[] | null> {
+    const db = await connect();
+    return db.db(dbName).collection<Pool>('pools').find().toArray();
+}
 
 //update user states
 export async function deletePoolsCollection(): Promise<void> {
@@ -159,11 +166,3 @@ export async function deletePoolsCollection(): Promise<void> {
 //     console.log('User with ordering data:', userWithOrderingData);
 // }
 
-export default {
-    connect,
-    createUser,
-    getUserByTelegramID,
-    addOrderingDataToUser,
-    deleteOrderingDataFromUser,
-    getUserByTelegramIDWithOrderingData
-};

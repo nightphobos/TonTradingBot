@@ -8,6 +8,7 @@ import { mnemonicToWalletKey } from '@ton/crypto';
 import { Pool, createPool, deletePoolsCollection, getPoolWithCaption } from '../ton-connect/mongo';
 import { number } from 'yargs';
 import { bigint } from 'zod';
+import { takeCoverage } from 'v8';
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 const factory = tonClient.open(Factory.createFromAddress(MAINNET_FACTORY_ADDR));
 
@@ -184,11 +185,10 @@ export async function getPair() {
         pool.caption = ['', ''];
         pool.prices = [0, 0];
         pool.TVL = 0;
-        const targetCoinId = 1 - checkHaveTrendingCoin(pool);
         let flag = true;
         for (let i = 0; i < 2; i++) {
             try {
-                const pricePost = await fetchPrice(1000000, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA', pool.assets[i]!);
+                const pricePost = await fetchPrice(1000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
                 pool.prices[i] = pricePost * nativePrice / 1000000000; // price in USD
                 const filteredAssets = assets.filter(asset => asset.address === pool.assets[i]?.replace('jetton:', ''));
                 if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
@@ -204,6 +204,7 @@ export async function getPair() {
                 continue;
             }
         }
+        pool.main = checkHaveTrendingCoin(pool);
         counter++;
         if (flag) {
             try {
@@ -217,23 +218,25 @@ export async function getPair() {
     return;
 }
 
-async function main() {
-                                                                                                                                                    const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage,cricket`
-    const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
-    const wallet = tonClient.open(
-        WalletContractV4.create({
-            workchain: 0,
-            publicKey: keyPair.publicKey
-        })
-    );
-    console.log('main');
-    //const jettonAddress = Address.parse('EQA2kCVNwVsil2EM2mB0SkXytxCqQjS4mttjDpnXmwG9T6bO');
-    const jUSDTAddress = Address.parse('EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
-    let sender = await wallet.sender(keyPair.secretKey);
-    //sender.address = wallet.address;
-    console.log(keyPair, wallet.address);
-    //await ton_to_Jetton(sender, jettonAddress, 0.00005);
-    //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
-    //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
-}
+// swap testing code part
+// async function main() {
+//                                                                                                                                                                                          const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage`
+//     const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
+
+//     const wallet = tonClient.open(
+//         WalletContractV4.create({
+//             workchain: 0,
+//             publicKey: keyPair.publicKey
+//         })
+//     );
+//     console.log('main');
+//     //const jettonAddress = Address.parse('EQA2kCVNwVsil2EM2mB0SkXytxCqQjS4mttjDpnXmwG9T6bO');
+//     const jUSDTAddress = Address.parse('EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
+//     let sender = await wallet.sender(keyPair.secretKey);
+//     //sender.address = wallet.address;
+//     console.log(keyPair, wallet.address);
+//     //await ton_to_Jetton(sender, jettonAddress, 0.00005);
+//     //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
+//     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
+// }
 //fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');

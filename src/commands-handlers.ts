@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import TelegramBot, { CallbackQuery, InlineKeyboardButton } from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
 import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException } from './utils';
-import { createUser, getUserByTelegramID, updateUserState,User } from './ton-connect/mongo';
+import { addOrderingDataToUser, createUser, getPools, getUserByTelegramID, OrderingData, updateUserState,User } from './ton-connect/mongo';
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
 import { fetchDataGet, Jetton } from './dedust/api';
@@ -14,7 +14,20 @@ let tonWeb = new TonWeb();
 let newConnectRequestListenersMap = new Map<number, () => void>();
 
 export const commandCallback = {
-    tradingCallback:handleTradingCallback
+    tradingCallback:handleTradingCallback,
+    addNewOrder:handleAddNewOrder
+}
+
+async function handleAddNewOrder(query: CallbackQuery){
+    const user = await getUserByTelegramID(query.from.id);
+    let newOrder: OrderingData = {
+        amount: user?.state.amount!,
+        jettons: user?.state.jettons!,
+        mainCoin: user?.state.mainCoin!,
+        isBuy: user?.state.isBuy!,
+        price: user?.state.price!,
+    };
+    addOrderingDataToUser(query.from.id, newOrder);
 }
 
 async function handleTradingCallback (query: CallbackQuery){
@@ -26,14 +39,15 @@ async function handleTradingCallback (query: CallbackQuery){
     updateUserState(query.from!.id, user!.state);
 
     //fetch assets from dedust API
-    const assets: Jetton[] = await fetchDataGet('/assets');
-    const rows = Math.ceil(assets.length / 4);
+    const pools = await getPools();
+    const rows = Math.ceil(pools!.length / 4);
 
     let keyboardArray: InlineKeyboardButton[][] = []; // Type annotation for keyboardArray
-    const filteredAssets = assets.filter(asset => asset !== undefined);
-    filteredAssets.map((asset, index) => {
+    const filteredAssets = pools!.filter(pool => pool !== undefined);
+    filteredAssets.map((pool, index) => {
         if (!!!keyboardArray[Math.floor(index / 4)]) keyboardArray[Math.floor(index / 4)] = [];
-        keyboardArray[Math.floor(index / 4)]![index % 4] = {text: asset.symbol, callback_data: `symbol-${asset.symbol}`};
+        const caption = pool.caption[0]! + '/' + pool.caption[1]!;
+        keyboardArray[Math.floor(index / 4)]![index % 4] = {text: caption, callback_data: `symbol-${caption}`};
     });
     
     await bot.editMessageReplyMarkup(
@@ -60,8 +74,8 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
          //set userstate idle
          updateUserState(userId,{
             state: 'idle',
-            fromJetton: '',
-            toJetton: '',
+            jettons: ['',''],
+            mainCoin: 0,
             amount: 0,
             price: 0,
             isBuy: false
@@ -85,8 +99,8 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
             publicKey: keyPair.publicKey.toString(),
             state:{
                 state: 'idle',
-                fromJetton: '',
-                toJetton: '',
+                jettons: ['',''],
+                mainCoin: 0,
                 amount: 0,
                 price: 0,
                 isBuy: false
