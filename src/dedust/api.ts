@@ -22,6 +22,15 @@ export interface Jetton{
     riskScore: string,
 }
 
+export interface walletAsset{
+    address: string,
+    asset:{
+        type: string,
+        address: string
+    },
+    balance: bigint
+}
+
 export interface PriceResult{
     pool:{
         address: string,
@@ -188,13 +197,13 @@ export async function getPair() {
         let flag = true;
         for (let i = 0; i < 2; i++) {
             try {
-                const pricePost = await fetchPrice(1000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
-                pool.prices[i] = pricePost * nativePrice / 1000000000; // price in USD
+                const pricePost = await fetchPrice(1000000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
                 const filteredAssets = assets.filter(asset => asset.address === pool.assets[i]?.replace('jetton:', ''));
                 if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
                     if (pool.assets[i] === 'native') pool.caption[i] = 'TON';
                     else pool.caption[i] = filteredAssets[0]!.symbol; //init caption
-                    pool.TVL += Number((pool.prices[i]! * pool.reserves[i]!) * (pool.caption[i]?.indexOf('USD') ? 1000 : 1));
+                pool.prices[i] = (pricePost * nativePrice / 1000000 ) / (pool.caption[i]?.indexOf('USD') ? 1000 : 1); // price in USD
+                pool.TVL += (pool.prices[i]! * pool.reserves[i]!);
                 } else {
                     flag = false;
                 }
@@ -240,3 +249,8 @@ export async function getPair() {
 //     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
 // }
 //fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
+(async () => {
+    console.log(
+        await fetchPrice(1000000000,'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA','jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
+    );
+})()

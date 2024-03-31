@@ -126,11 +126,8 @@ async function main(): Promise<void> {
                         inline_keyboard:[[
                             {text:'I agree', callback_data: JSON.stringify({ method: 'addNewOrder' })},
                             {text:'I don\'t agree', callback_data: JSON.stringify({ method: 'tradingCallback'})}
-                        ]]
-                    }
-                }
-                );
-
+                ]]}});
+            
         }else{
             return;
         }

@@ -8,7 +8,7 @@ import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutExceptio
 import { addOrderingDataToUser, createUser, getPools, getUserByTelegramID, OrderingData, updateUserState,User } from './ton-connect/mongo';
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
-import { fetchDataGet, Jetton } from './dedust/api';
+import { fetchDataGet, Jetton, walletAsset } from './dedust/api';
 let tonWeb = new TonWeb();
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
@@ -27,7 +27,30 @@ async function handleAddNewOrder(query: CallbackQuery){
         isBuy: user?.state.isBuy!,
         price: user?.state.price!,
     };
-    addOrderingDataToUser(query.from.id, newOrder);
+    //check balance
+    
+    let mainId = 0, flag = true;
+    const walletBalance: walletAsset[] = await fetchDataGet(`/accounts/${user?.walletAddress}/assets`);
+    walletBalance.map((walletasset => {
+        if(user?.state.isBuy) mainId = 1 - user?.state.mainCoin;
+        else mainId = user?.state.mainCoin!;
+        if(walletasset.asset.address == user?.state.jettons[mainId]){
+            if( walletasset.balance < BigInt(user?.state.amount * 1000000 * user?.state.jettons[mainId]!.indexOf('USD') ? 1 : 1000) ){
+                bot.sendMessage(query.message!.chat.id,`Your ${user?.state.jettons[mainId]} balance is not enough!`);
+                flag = false;
+                return;
+                
+            }
+        }
+    }))
+    if(flag){
+        await addOrderingDataToUser(query.from.id, newOrder);
+        bot.sendMessage(query.message!.chat.id,`New Order is Succesfuly booked, Press /start`);
+    }
+    else {
+        bot.sendMessage(query.message!.chat.id,`New Order is failed due to invalid balance, Press /start`);
+    }
+    //new order added
 }
 
 async function handleTradingCallback (query: CallbackQuery){
@@ -267,14 +290,10 @@ export async function handleSendTXCommand(msg: TelegramBot.Message): Promise<voi
         `Open ${walletInfo?.name || connector.wallet!.device.appName} and confirm transaction`,
         {
             reply_markup: {
-                inline_keyboard: [
-                    [
-                        {
-                            text: `Open ${walletInfo?.name || connector.wallet!.device.appName}`,
-                            url: deeplink
-                        }
-                    ]
-                ]
+                inline_keyboard: [[{
+                    text: `Open ${walletInfo?.name || connector.wallet!.device.appName}`,
+                    url: deeplink
+                }]]
             }
         }
     );
