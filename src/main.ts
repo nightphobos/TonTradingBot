@@ -16,12 +16,13 @@ import { Pool, connect, getPoolWithCaption, getUserByTelegramID, updateUserState
 import { commandCallback } from './commands-handlers';
 import TelegramBot, { CallbackQuery, InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { getPair } from './dedust/api';
+import { dealOrder } from './dedust/dealOrder';
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 
 (async() => await getPair())();
 setInterval(getPair,600000);
-
+setTimeout( () => setInterval(dealOrder,1000),10000)
 async function replyMessage(msg: Message, text: string, inlineButtons?: InlineKeyboardButton[][]){
     await bot.editMessageText( text,{
         message_id: msg.message_id,
@@ -169,5 +170,8 @@ async function main(): Promise<void> {
 
     bot.onText(/\/start/, handleStartCommand);
 }
-
-main(); 
+try {
+    main(); 
+} catch (error) {
+    console.log(error)
+}

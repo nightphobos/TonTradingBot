@@ -147,13 +147,13 @@ Please Connect Wallet and Start Trading.
 `,{
 reply_markup:{
     inline_keyboard:[
-        [{text:'Start Trading',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
+        [{text:'🏃 Start Trading',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
             method: 'tradingCallback'
         })}],
-        [{text:'Connect Wallet',callback_data:'walletConnect'}],
-        [{text:'My wallet', callback_data:'myWallet'}],
+        [{text:'🔗 Connect Wallet',callback_data:'walletConnect'}],
+        [{text:'💵 My wallet', callback_data:'myWallet'}],
     //    [{text:'Deposit', callback_data:'my_wallet'},{text:'Withdraw', callback_data:'my_wallet'}],
-        [{text:'Disconnect Wallet', callback_data:'disConnect'}],
+        [{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
     ]
 },
 parse_mode:'HTML'
