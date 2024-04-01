@@ -46,7 +46,7 @@ export interface PriceResult{
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export async function ton_to_Jetton(sender: Sender, jettonAddress: Address, amountIn: number) {
+export async function ton_to_Jetton(sender: Sender, jettonAddress: Address, amountIn: bigint) {
     const tonVault = tonClient.open(await factory.getNativeVault());
 
     const TON = Asset.native();
@@ -70,7 +70,7 @@ export async function jetton_to_Ton(
     sender: Sender,
     userAddress: Address,
     jettonAddress: Address,
-    jettonAmount: number
+    jettonAmount: bigint
 ) {
     const jettonRoot = tonClient.open(JettonRoot.createFromAddress(jettonAddress));
     let jettonWallet: OpenedContract<JettonWallet>;
@@ -105,7 +105,7 @@ export async function jetton_to_Jetton(
     userAddress: Address,
     jettonAddress_A: Address,
     jettonAddress_B: Address,
-    fromAmount: number
+    fromAmount: bigint
 ) {
     const jetton_A = Asset.jetton(jettonAddress_A);
     const TON = Asset.native();

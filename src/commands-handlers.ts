@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import TelegramBot, { CallbackQuery, InlineKeyboardButton } from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
 import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException } from './utils';
-import { addOrderingDataToUser, createUser, getPools, getUserByTelegramID, OrderingData, updateUserState,User } from './ton-connect/mongo';
+import { addOrderingDataToUser, createUser, getPools, getPoolWithCaption, getUserByTelegramID, OrderingData, updateUserState,User } from './ton-connect/mongo';
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
 import { fetchDataGet, Jetton, walletAsset } from './dedust/api';
@@ -29,16 +29,17 @@ async function handleAddNewOrder(query: CallbackQuery){
     };
     //check balance
     
-    let mainId = 0, flag = true;
+    let mainId = 0, flag = false;
+    const pool = await getPoolWithCaption(user?.state.jettons!);
     const walletBalance: walletAsset[] = await fetchDataGet(`/accounts/${user?.walletAddress}/assets`);
     walletBalance.map((walletasset => {
         if(user?.state.isBuy) mainId = 1 - user?.state.mainCoin;
         else mainId = user?.state.mainCoin!;
         if(walletasset.asset.address == user?.state.jettons[mainId]){
-            if( walletasset.balance < BigInt(user?.state.amount * 1000000 * user?.state.jettons[mainId]!.indexOf('USD') ? 1 : 1000) ){
+            flag = true;
+            if( walletasset.balance < BigInt(user?.state.amount * pool?.decimals[mainId]!)){
                 bot.sendMessage(query.message!.chat.id,`Your ${user?.state.jettons[mainId]} balance is not enough!`);
                 flag = false;
-                console.log(walletasset)
 
                 return;
             }
@@ -81,7 +82,6 @@ async function handleTradingCallback (query: CallbackQuery){
             chat_id: query.message?.chat.id
         }
     );
-    await bot.sendMessage(query.message!.chat.id,'First select jetton to sell');
 }
 
 export async function handleStartCommand (msg: TelegramBot.Message)  {

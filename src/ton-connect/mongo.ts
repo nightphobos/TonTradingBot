@@ -80,6 +80,16 @@ export async function getUserByTelegramID(telegramID: number): Promise<User | nu
         .findOne({ telegramID });
 }
 
+// Get a user by Telegram ID
+export async function getAllUsers(): Promise<User[] | null> {
+
+    const db = await connect();
+    return db
+        .db(dbName)
+        .collection<User>('users')
+        .find({}).toArray();
+}
+
 // Add ordering data to a user
 export async function addOrderingDataToUser(
     telegramID: number,
