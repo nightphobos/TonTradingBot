@@ -51,6 +51,9 @@ async function main(): Promise<void> {
             return;
         }
         switch (query.data) {
+            case 'newStart':
+                handleStartCommand(query.message!);
+                return;
             case 'walletConnect':
                 handleConnectCommand(query.message!);
                 return;
@@ -79,6 +82,8 @@ async function main(): Promise<void> {
                 await replyMessage(query.message!, `Do you want to buy/sell?`, [[
                     {text: 'Buy', callback_data: `symbol-buy`},
                     {text: 'Sell', callback_data: `symbol-sell`}
+                ],[
+                    {text:'<< Back', callback_data: 'newStart'}
                 ]] )
             }else if ( user!.state.state == 'selectPair' ){
                 let selectedPool = await getPoolWithCaption(user!.state.jettons);
@@ -91,7 +96,10 @@ async function main(): Promise<void> {
 
                 const price = selectedPool?.prices[1-state.mainCoin]! / selectedPool?.prices[state.mainCoin]!;
                 
-                await replyMessage(query.message!, `Please input Ordering price\n 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}` )
+                await replyMessage(query.message!, 
+                    `Please input Ordering price\n 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`,
+                    [[ {text:'<< Back', callback_data: 'newStart'} ]]
+                )
                 
             }
             // else{
@@ -122,7 +130,12 @@ async function main(): Promise<void> {
         if(user?.state.state == 'isBuy'){
             user.state.state = 'price';
             user.state.price = Number(msg.text);
-            await bot.sendMessage(msg.chat.id, 'Please input amount to swap');
+            await bot.sendMessage(msg.chat.id, 'Please input amount to swap',
+            {
+                reply_markup:{
+                    inline_keyboard:[[ {text:'<< Back', callback_data: 'newStart'} ]]
+                }
+            });
         }else if(user?.state.state == 'price'){
             let state = user.state;
             user.state.state = 'amount';
@@ -134,6 +147,8 @@ async function main(): Promise<void> {
                     inline_keyboard:[[
                         {text:'I agree', callback_data: JSON.stringify({ method: 'addNewOrder' })},
                         {text:'I don\'t agree', callback_data: JSON.stringify({ method: 'tradingCallback'})}
+                    ],[
+                        {text:'<< Back', callback_data: 'newStart'}
                     ]]
                     }
                 }
