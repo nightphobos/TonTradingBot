@@ -18,7 +18,7 @@ export interface Jetton{
     name: string,
     symbol: string,
     image: string
-    decimals: string,
+    decimals: number,
     riskScore: string,
 }
 
@@ -194,15 +194,21 @@ export async function getPair() {
         pool.caption = ['', ''];
         pool.prices = [0, 0];
         pool.TVL = 0;
+        pool.decimals = [0,0];
         let flag = true;
         for (let i = 0; i < 2; i++) {
             try {
-                const pricePost = await fetchPrice(1000000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
                 const filteredAssets = assets.filter(asset => asset.address === pool.assets[i]?.replace('jetton:', ''));
+                let decimals = 0;
                 if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
-                    if (pool.assets[i] === 'native') pool.caption[i] = 'TON';
-                    else pool.caption[i] = filteredAssets[0]!.symbol; //init caption
-                pool.prices[i] = (pricePost * nativePrice / 1000000 ) / (pool.caption[i]?.indexOf('USD') ? 1000 : 1); // price in USD
+                    if (pool.assets[i] === 'native'){ pool.caption[i] = 'TON'; decimals = 9}
+                    else { pool.caption[i] = filteredAssets[0]!.symbol; decimals = filteredAssets[0]?.decimals!} //init caption
+                    const pricePost = await fetchPrice(10 ** decimals,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
+                    
+                    pool.decimals[i] = decimals;
+                    pool.prices[i] = (pricePost * nativePrice / 10 ** 6 )  // price in USD
+                    if(pool.assets[i] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
+                    pool.prices[i] = nativePrice;
                 pool.TVL += (pool.prices[i]! * pool.reserves[i]!);
                 } else {
                     flag = false;

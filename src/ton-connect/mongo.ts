@@ -40,6 +40,7 @@ export interface User {
     reserves: number[],
     fees: number[],
     volume: bigint[],
+    decimals: number[],
     TVL: number,
     main:number,
 }

@@ -38,8 +38,9 @@ async function handleAddNewOrder(query: CallbackQuery){
             if( walletasset.balance < BigInt(user?.state.amount * 1000000 * user?.state.jettons[mainId]!.indexOf('USD') ? 1 : 1000) ){
                 bot.sendMessage(query.message!.chat.id,`Your ${user?.state.jettons[mainId]} balance is not enough!`);
                 flag = false;
+                console.log(walletasset)
+
                 return;
-                
             }
         }
     }))

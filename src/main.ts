@@ -14,12 +14,28 @@ import { initRedisClient } from './ton-connect/storage';
 import TonWeb from 'tonweb';
 import { Pool, connect, getPoolWithCaption, getUserByTelegramID, updateUserState } from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot, { CallbackQuery, InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { getPair } from './dedust/api';
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 (async() => await getPair())();
-setInterval(getPair,60000);
+setInterval(getPair,600000);
+async function replyMessage(msg: Message, text: string, inlineButtons?: InlineKeyboardButton[][]){
+    await bot.editMessageText( `Do you want to buy/sell?`,{
+        message_id: msg.message_id,
+        chat_id: msg.chat.id,
+        parse_mode: 'HTML'
+    });
+    if(inlineButtons != undefined)
+        await bot.editMessageReplyMarkup(
+            { inline_keyboard: inlineButtons! },
+            {
+                message_id: msg.message_id,
+                chat_id: msg.chat.id
+            }
+        );
+}
+
 async function main(): Promise<void> {
     await initRedisClient();
     await connect();
@@ -49,7 +65,7 @@ async function main(): Promise<void> {
         //jetton click processing 
         if(query.data.indexOf('symbol-') + 1){
             console.log(query.data, ':49');
-            const clickedSymbol = query.data.replace('symbol-','');
+            const clickedSymbol = query.data.replace( 'symbol-', '' );
             let user = await getUserByTelegramID(query.from.id);
             //check user state is trade
             if( user!.state.state == 'trading' ){
@@ -58,23 +74,10 @@ async function main(): Promise<void> {
                 let selectedPool = await getPoolWithCaption(clickedSymbol.split('/'));
                 user!.state.jettons = clickedSymbol.split('/');
                 user!.state.mainCoin = selectedPool!.main;
-
-                await bot.editMessageText( `Do you want to buy/sell?`,{
-                    message_id: query.message?.message_id,
-                    chat_id: query.message?.chat.id
-                });
-                await bot.editMessageReplyMarkup(
-                    {
-                        inline_keyboard: [[
-                            {text: 'Buy', callback_data: `symbol-buy`},
-                            {text: 'Sell', callback_data: `symbol-sell`}
-                        ]] 
-                    },
-                    {
-                        message_id: query.message?.message_id,
-                        chat_id: query.message?.chat.id
-                    }
-                );
+                replyMessage(query.message!, `Do you want to buy/sell?`, [[
+                    {text: 'Buy', callback_data: `symbol-buy`},
+                    {text: 'Sell', callback_data: `symbol-sell`}
+                ]] )
             }else if ( user!.state.state == 'selectPair' ){
                 let selectedPool = await getPoolWithCaption(user!.state.jettons);
                 let state = user!.state;
@@ -85,7 +88,9 @@ async function main(): Promise<void> {
                 else state.isBuy = false;
 
                 const price = selectedPool?.prices[1-state.mainCoin]! / selectedPool?.prices[state.mainCoin]!;
-                bot.sendMessage( query.message!.chat.id,`Please input Ordering price\n 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`);
+                
+                replyMessage(query.message!, `Please input Ordering price\n 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`, [[]] )
+                
             }
             // else{
             //     bot.sendMessage(query.from.id, "Please click <b>Start trading</b> from /start message to trade", {parse_mode: 'HTML'});
@@ -109,24 +114,24 @@ async function main(): Promise<void> {
     });
     
     bot.on('text',async (msg: TelegramBot.Message) => {
+        
         console.log(msg.text);
         let user = await getUserByTelegramID(msg.from!.id);
         if(user?.state.state == 'isBuy'){
             user.state.state = 'price';
             user.state.price = Number(msg.text);
-            bot.sendMessage(msg.chat.id,'Please input amount to swap');
+            replyMessage(msg, 'Please input amount to swap', [[]]);
         }else if(user?.state.state == 'price'){
             let state = user.state;
             user.state.state = 'amount';
             user.state.amount = Number(msg.text);
-            bot.sendMessage(msg.chat.id,
-                `Please Review your new Order\nPool : ${state.jettons.join('/')}\nBuy/Sell : ${state.isBuy ? 'Buy' : 'Sell'}\nPrice : ${state.price}\nAmount : ${state.amount}`,
-                {
-                    reply_markup:{
-                        inline_keyboard:[[
-                            {text:'I agree', callback_data: JSON.stringify({ method: 'addNewOrder' })},
-                            {text:'I don\'t agree', callback_data: JSON.stringify({ method: 'tradingCallback'})}
-                ]]}});
+            replyMessage(msg,
+                `Please Review your new Order\nPool : ${state.jettons.join('/')}\nBuy/Sell : ${state.isBuy ? 'Buy' : 'Sell'}\nPrice : ${state.price}\nAmount : ${state.amount}`, 
+                [[
+                    {text:'I agree', callback_data: JSON.stringify({ method: 'addNewOrder' })},
+                    {text:'I don\'t agree', callback_data: JSON.stringify({ method: 'tradingCallback'})}
+                ]]
+            );
             
         }else{
             return;
