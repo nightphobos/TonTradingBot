@@ -1,5 +1,6 @@
 import { encodeTelegramUrlParameters, isTelegramUrl, WalletInfoRemote } from '@tonconnect/sdk';
-import { InlineKeyboardButton } from 'node-telegram-bot-api';
+import { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
+import { bot } from './bot';
 
 export const AT_WALLET_APP_NAME = 'telegram-wallet';
 
@@ -70,4 +71,20 @@ export async function buildUniversalKeyboard(
     }
 
     return keyboard;
+}
+
+export async function replyMessage(msg: Message, text: string, inlineButtons?: InlineKeyboardButton[][]){
+    await bot.editMessageText( text,{
+        message_id: msg.message_id,
+        chat_id: msg.chat.id,
+        parse_mode: 'HTML'
+    });
+    if(inlineButtons != undefined)
+        await bot.editMessageReplyMarkup(
+            { inline_keyboard: inlineButtons! },
+            {
+                message_id: msg.message_id,
+                chat_id: msg.chat.id
+            }
+        );
 }

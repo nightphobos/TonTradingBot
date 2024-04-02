@@ -1,5 +1,5 @@
 import TonWeb from "tonweb";
-import { getAllUsers, getPoolWithCaption } from "../ton-connect/mongo";
+import { deleteOrderingDataFromUser, getAllUsers, getPoolWithCaption } from "../ton-connect/mongo";
 import { Address, TonClient4, WalletContractV4 } from "@ton/ton";
 import { keyPairFromSecretKey } from "@ton/crypto";
 import { fetchPrice, jetton_to_Jetton, jetton_to_Ton, ton_to_Jetton } from "./api";
@@ -36,14 +36,18 @@ export async function dealOrder(){
                 //ton_to_jetton case
                 try {
                     const pricePost = await fetchPrice(10 **  pool!.decimals[1 - mainCoinId]!,  'jetton:'+toAddress, 'jetton:'+fromAddress);
-                    if(pricePost >= order.price * 10 ** pool!.decimals[mainCoinId]!)
+                    let amountNano = BigInt(10 **  pool!.decimals[1 - mainCoinId]!) * amount;
+                    //compare price and send tx , delete document.
+                    if(pricePost * (order.isBuy ? 1 : -1) <= order.price * 10 ** pool!.decimals[mainCoinId]! * (order.isBuy ? 1 : -1)){
                         if(fromJetton == "TON"){
-                            await ton_to_Jetton(sender, Address.parse(toAddress), amount);
+                            await ton_to_Jetton(sender, Address.parse(toAddress), amountNano);
                         } else if(toJetton == "TON"){
-                            await jetton_to_Ton(sender, wallet.address, Address.parse(toAddress), amount);
+                            await jetton_to_Ton(sender, wallet.address, Address.parse(toAddress), amountNano);
                         } else {
-                            await jetton_to_Jetton(sender, wallet.address, Address.parse(fromAddress), Address.parse(toAddress), amount);
+                            await jetton_to_Jetton(sender, wallet.address, Address.parse(fromAddress), Address.parse(toAddress), amountNano);
                         }
+                        deleteOrderingDataFromUser(user.telegramID,order._id!);
+                    }
                 } catch (error) {
                     
                 }

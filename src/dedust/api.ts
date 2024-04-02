@@ -60,7 +60,7 @@ export async function ton_to_Jetton(sender: Sender, jettonAddress: Address, amou
 
     await tonVault.sendSwap(sender, {
         poolAddress: pool.address,
-        amount: toNano(amountIn),
+        amount: (amountIn),
         gasAmount: toNano(0.25)
     });
 }
@@ -90,7 +90,7 @@ export async function jetton_to_Ton(
     }
     console.log(pool);
     const result = await jettonWallet.sendTransfer(sender, toNano(0.3), {
-        amount: toNano(jettonAmount),
+        amount: (jettonAmount),
         destination: jettonVault.address,
         responseAddress: userAddress, // return gas to user
         forwardAmount: toNano(0.25),
@@ -124,7 +124,7 @@ export async function jetton_to_Jetton(
         sender,
         toNano(0.3), // 0.6% TON
         {
-            amount: toNano(fromAmount),
+            amount: (fromAmount),
             destination: jettonVault_A.address,
             responseAddress: userAddress, // return gas to user
             forwardAmount: toNano(0.25), // 0.5% TON
@@ -165,16 +165,16 @@ export async function fetchPrice(amount: number, from: string, to: string){
 } 
 function checkHaveTrendingCoin(pool: Pool){
     if ( //maintain only trending currencies
-        pool.assets[0] == 'native' ||
-        pool.assets[0] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
-        pool.assets[0] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
-        pool.assets[0] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
+        pool.assets[0] == 'native' //||
+        //pool.assets[0] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
+        //pool.assets[0] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
+        //pool.assets[0] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
     ) return 0; 
     else if (
-        pool.assets[1] == 'native' ||
-        pool.assets[1] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
-        pool.assets[1] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
-        pool.assets[1] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
+        pool.assets[1] == 'native' //||
+        // pool.assets[1] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' || //jUSDT
+        // pool.assets[1] == 'jetton:EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbIfW_t-SCALE' || //SCALE
+        // pool.assets[1] == 'jetton:EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728' //jUSDC
     ) return 1;
     else return -1;
 }
@@ -188,7 +188,7 @@ export async function getPair() {
     //TON price
     const nativePrice = extPrice.find(p => p.symbol === 'USDT')?.price || 0;
     let pools: Pool[] = await fetchDataGet('/pools-lite');
-    pools = pools.filter(pool => checkHaveTrendingCoin(pool) >= 0 && pool.volume[0]! > 0);
+    pools = pools.filter(pool => checkHaveTrendingCoin(pool) >= 0 && pool!.reserves![0]! > toNano(100));
     
     await Promise.all(pools.map(async (pool, index) => {
         pool.caption = ['', ''];
@@ -229,7 +229,7 @@ export async function getPair() {
             }
         }
     }));
-    
+    console.log("===>Loading finished<===")
     return;
 }
 

