@@ -15,7 +15,7 @@ export interface User {
     telegramID: number;
     walletAddress: string;
     secretKey: string;
-    publicKey:string;
+    mode:string;
     state: {
         state: string;
         jettons: string[];
@@ -62,6 +62,15 @@ export async function updateUserState(telegramID: number, newState: User['state'
         .db(dbName)
         .collection<User>('users')
         .updateOne({ telegramID }, { $set: { state: newState } });
+}
+
+//update user mode
+export async function updateUserMode(telegramID: number, newMode: string): Promise<void> {
+    const db = await connect();
+    await db
+        .db(dbName)
+        .collection<User>('users')
+        .updateOne({ telegramID }, { $set: { mode: newMode } });
 }
 // Create a new user
 export async function createUser(user: User): Promise<ObjectId> {

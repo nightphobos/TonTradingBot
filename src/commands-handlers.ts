@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import TelegramBot, { CallbackQuery, InlineKeyboardButton,Message } from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
 import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException , replyMessage} from './utils';
-import { addOrderingDataToUser, createUser, getPools, getPoolWithCaption, getUserByTelegramID, OrderingData, updateUserState,User } from './ton-connect/mongo';
+import { addOrderingDataToUser, createUser, getPools, getPoolWithCaption, getUserByTelegramID, OrderingData, updateUserMode, updateUserState,User } from './ton-connect/mongo';
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
 import { fetchDataGet, Jetton, walletAsset } from './dedust/api';
@@ -79,6 +79,7 @@ async function handleTradingCallback (query: CallbackQuery){
         
         let user = await getUserByTelegramID(query.message?.chat!.id!);
         user!.state.state = 'trading';
+        updateUserMode(query.message?.chat!.id!, '');
         updateUserState(query.message?.chat!.id!, user!.state);
 
         //fetch assets from dedust API
@@ -160,7 +161,7 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
             telegramID: msg.chat!.id,
             walletAddress: address.toString(),
             secretKey: mnemonics.join(','),
-            publicKey: '',
+            mode: '',
             state:{
                 state: 'idle',
                 jettons: ['',''],
@@ -185,7 +186,7 @@ Please <b>Connect Wallet</b> to <b>Deposit</b> and <b>Start Trading</b>.
 reply_markup:{
     inline_keyboard:[
         [{text:'💵 My wallet', callback_data:'showMyWallet'}],
-        [{text:'♻️ Instant Swap', web_app:{url:'https://dedust.io/swap'}},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
+        [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
             method: 'tradingCallback'
         })}],
         [{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
@@ -405,7 +406,7 @@ export async function handleWithdrawCommand(query: CallbackQuery){
                     outputStr += asset.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset.decimals) + ' ' + asset.symbol + '\n';
                     if(buttons[Math.floor(counter/3)])
                         buttons[Math.floor(counter/3)] = []
-                    buttons[Math.floor(counter/3)]![counter % 3] = {text:asset.symbol, callback_data: 'symbol-with-' + asset.symbol}
+                    buttons[Math.floor(counter/3)]![counter % 3] = {text:asset.symbol, callback_data: 'with-' + asset.symbol}
                 }
         });
     });
@@ -458,4 +459,43 @@ export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promi
         `💵 My wallet\n\nYour RewardBot Wallet address:\n <code>${address}</code>\n ${outputStr}`,
         [[{text:'<< Back', callback_data: 'newStart'}]]
     )
+}
+
+export async function handleInstanteSwap(query: CallbackQuery): Promise<void> {
+    try{
+        let user = await getUserByTelegramID(query.message!.chat.id);
+        user!.state.state = 'trading';
+        updateUserMode(query.message?.chat.id!,"swap");
+        updateUserState(query.message?.chat!.id!, user!.state);
+
+        //fetch assets from dedust API
+        const pools = await getPools();
+        const rows = Math.ceil(pools!.length / 4);
+
+        // let keyboardArray: InlineKeyboardButton[][] = []; // Type annotation for keyboardArray
+        // const filteredAssets = pools!.filter(pool => pool !== undefined);
+        // filteredAssets.map((pool, index) => {
+        //     if (!!!keyboardArray[Math.floor(index / 4)]) keyboardArray[Math.floor(index / 4)] = [];
+        //     const caption = pool.caption[0]! + '/' + pool.caption[1]!;
+        //     keyboardArray[Math.floor(index / 4)]![index % 4] = {text: caption, callback_data: `symbol-${caption}`};
+        // });
+        // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
+        await bot.editMessageText(
+            `♻️ Instant Swap\n\n💡Please type in Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT" or "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
+            {
+                message_id: query.message?.message_id,
+                chat_id: query.message?.chat.id
+            }
+        )
+        await bot.editMessageReplyMarkup(
+            { inline_keyboard: [[{text:'<< Back', callback_data: 'newStart'}]] },
+            {
+                message_id: query.message?.message_id,
+                chat_id: query.message?.chat.id
+            }
+        );
+            
+    } catch (error) {
+        console.log(error)
+    }
 }

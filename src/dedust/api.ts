@@ -1,14 +1,15 @@
 import { Factory, JettonWallet, MAINNET_FACTORY_ADDR, VaultJetton } from '@dedust/sdk';
 import { Address, TonClient4, Sender, WalletContractV3R2, WalletContractV4 } from '@ton/ton';
-import { OpenedContract, toNano } from '@ton/core';
+import { Cell, OpenedContract, beginCell, internal, storeMessageRelaxed, toNano } from '@ton/core';
 import { Asset, PoolType, ReadinessStatus, JettonRoot } from '@dedust/sdk';
 import axios from 'axios';
-import { mnemonicToWalletKey } from '@ton/crypto';
+import { mnemonicToPrivateKey, mnemonicToWalletKey } from '@ton/crypto';
 
 import { Pool, createPool, deletePoolsCollection, getPoolWithCaption } from '../ton-connect/mongo';
 import { number } from 'yargs';
 import { bigint } from 'zod';
 import { takeCoverage } from 'v8';
+import TonWeb from 'tonweb';
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 const factory = tonClient.open(Factory.createFromAddress(MAINNET_FACTORY_ADDR));
 
@@ -138,6 +139,82 @@ export async function jetton_to_Jetton(
     );
 }
 
+
+export async function sendTon(
+    mnemonics: string[],
+    tonAmount:bigint,
+    targetAddress: string
+) {
+      let keyPair = await mnemonicToPrivateKey(mnemonics);
+      
+      // Create wallet contract
+      let workchain = 0; // Usually you need a workchain 0
+      let wallet = WalletContractV4.create({ workchain, publicKey: keyPair.publicKey });
+      let contract = tonClient.open(wallet);
+      
+      // Create a transfer
+      let seqno: number = await contract.getSeqno();
+      await contract.sendTransfer({
+        seqno,
+        secretKey: keyPair.secretKey,
+        messages: [internal({
+          value: tonAmount,
+          to: targetAddress,
+          body: '',
+        })]
+      });
+}
+// export async function sendJetton(){
+//     const WalletClass = tonweb.wallet.all['v4r2'];
+//     const wallet = new WalletClass(tonweb.provider, {
+//         publicKey: keyPair.publicKey,
+//         wc: 0
+//     });
+//     const seqno = (await wallet.methods.seqno().call()) || 0;
+//     console.log({seqno})
+
+//     console.log(
+//         await wallet.methods.transfer({
+//             secretKey: keyPair.secretKey,
+//             toAddress: JETTON_WALLET_ADDRESS,
+//             amount: TonWeb.utils.toNano('0.05'),
+//             seqno: seqno,
+//             payload: await jettonWallet.createTransferBody({
+//                 jettonAmount: TonWeb.utils.toNano('500'),
+//                 toAddress: new TonWeb.utils.Address(WALLET2_ADDRESS),
+//                 forwardAmount: TonWeb.utils.toNano('0.01'),
+//                 forwardPayload: new TextEncoder().encode('gift'),
+//                 responseAddress: walletAddress
+//             }),
+//             sendMode: 3,
+//         }).send()
+//     );
+// }
+export async function sendJetton(
+    sender: Sender,
+    userAddress: Address,
+    jettonAddress: Address,
+    jettonAmount: bigint,
+    targetAddress:Address
+) {
+    const jettonRoot = tonClient.open(JettonRoot.createFromAddress(jettonAddress));
+    let jettonWallet: OpenedContract<JettonWallet>;
+    if (userAddress) jettonWallet = tonClient.open(await jettonRoot.getWallet(userAddress));
+    else {
+        console.log('cannot find wallet!!!', sender);
+        return;
+    }
+    // const jettonVault: VaultJetton = tonClient.open(await factory.getJettonVault(jettonAddress));
+    console.log('targetAddress')
+    const result = await jettonWallet.sendTransfer(sender, toNano(0.3), {
+        amount: (jettonAmount),
+        destination: targetAddress,
+        responseAddress: userAddress, // return gas to user
+        forwardAmount: toNano(0.25),
+         forwardPayload:new Cell(),
+    });
+    console.log(result);
+}
 //eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function fetchDataGet(fetchURL: String) {
     try {
@@ -238,24 +315,31 @@ export async function getPair() {
 }
 
 // swap testing code part
-// async function main() {
-//                                                                                                                                                                                          const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage`
-//     const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
+async function main() {
+                                                                                                                                                                                         const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage`
+    const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
 
-//     const wallet = tonClient.open(
-//         WalletContractV4.create({
-//             workchain: 0,
-//             publicKey: keyPair.publicKey
-//         })
-//     );
-//     console.log('main');
-//     //const jettonAddress = Address.parse('EQA2kCVNwVsil2EM2mB0SkXytxCqQjS4mttjDpnXmwG9T6bO');
-//     const jUSDTAddress = Address.parse('EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
-//     let sender = await wallet.sender(keyPair.secretKey);
-//     //sender.address = wallet.address;
-//     console.log(keyPair, wallet.address);
-//     //await ton_to_Jetton(sender, jettonAddress, 0.00005);
-//     //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
-//     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
-// }
+    const wallet = tonClient.open(
+        WalletContractV4.create({
+            workchain: 0,
+            publicKey: keyPair.publicKey
+        })
+    );
+    console.log('main');
+    //const jettonAddress = Address.parse('EQA2kCVNwVsil2EM2mB0SkXytxCqQjS4mttjDpnXmwG9T6bO');
+    const jUSDTAddress = Address.parse('EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
+    let sender = await wallet.sender(keyPair.secretKey);
+    //sender.address = wallet.address;
+    await sendJetton(
+        sender,
+        wallet.address,
+        jUSDTAddress,
+        toNano( 0.0001),
+        Address.parse('EQC5orS7hZ6migfohOnckOg5qrL0qGq-vNv4fqiVhzlz5d2U')
+    )
+    console.log(keyPair, wallet.address);
+    //await ton_to_Jetton(sender, jettonAddress, 0.00005);
+    //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
+    //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
+}
 //fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
