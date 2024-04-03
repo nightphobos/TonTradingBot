@@ -155,7 +155,7 @@ export async function fetchDataGet(fetchURL: String) {
 
 export async function fetchPrice(amount: number, from: string, to: string){
     if(from == to) return amount;
-    console.log(from,to)
+    //console.log(from,to)
     //console.log({ amount, from, to });
     if(from != 'native')
     if(from.indexOf('jetton:') + 1)
@@ -259,8 +259,3 @@ export async function getPair() {
 //     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
 // }
 //fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
-(async () => {
-    console.log(
-        await fetchPrice(1000000000,'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA','jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
-    );
-})()

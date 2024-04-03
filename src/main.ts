@@ -63,15 +63,12 @@ async function main(): Promise<void> {
                 break;
         }
         
-        console.log(query.data, ':46');
         //jetton click processing 
         if(query.data.indexOf('symbol-') + 1){
-            console.log(query.data, ':49');
             const clickedSymbol = query.data.replace( 'symbol-', '' );
             let user = await getUserByTelegramID(query.message?.chat!.id!);
             //check user state is trade
             if( user!.state.state == 'trading' ){
-
                 user!.state.state = 'selectPair';
                 let selectedPool = await getPoolWithCaption(clickedSymbol.split('/'));
                 user!.state.jettons = clickedSymbol.split('/');
@@ -94,7 +91,7 @@ async function main(): Promise<void> {
                 const price = selectedPool?.prices[1-state.mainCoin]! / selectedPool?.prices[state.mainCoin]!;
                 
                 await replyMessage(query.message!, 
-                    `🏃 Trading\n\n💡Please input amount of jetton in ` + state.jettons[state.mainCoin]/* 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`*/,
+                    `🏃 Trading\n\n💡Please input amount of jetton in ` + state.jettons[1 - state.mainCoin]/* 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`*/,
                     [[ {text:'<< Back', callback_data: 'newStart'} ]]
                 )
                 
@@ -122,7 +119,6 @@ async function main(): Promise<void> {
     
     bot.on('text',async (msg: TelegramBot.Message) => {
         
-        console.log(msg);
         let user = await getUserByTelegramID(msg.chat!.id);
         let assets: Jetton[] = await fetchDataGet('/assets');
         if(!!!user) return;
@@ -170,7 +166,7 @@ async function main(): Promise<void> {
             user.state.state = 'price';
             user.state.amount = Number(msg.text);
             
-            await bot.sendMessage(msg.chat.id, '🏃 Trading\n\n💡Please input limit price in ' + user.state.jettons[1 - user.state.mainCoin],
+            await bot.sendMessage(msg.chat.id, '🏃 Trading\n\n💡Please input limit price in ' + user.state.jettons[user.state.mainCoin],
             {
                 reply_markup:{
                     inline_keyboard:[[ {text:'<< Back', callback_data: 'newStart'} ]]
@@ -181,7 +177,7 @@ async function main(): Promise<void> {
             user.state.price = Number(msg.text);
             user.state.state = 'amount';
             await bot.sendMessage(msg.chat.id,
-                `🏃 Trading\n\n💡Please Review your new Order\nPool : ${state.jettons.join('/')}\nBuy/Sell : ${state.isBuy ? 'Buy' : 'Sell'}\nAmount : ${state.amount} ${state.jettons[state.mainCoin]} = \nPrice : ${state.price} ${state.jettons[state.mainCoin]}`, 
+                `🏃 Trading\n\n💡Please Review your new Order\nPool : ${state.jettons.join('/')}\nBuy/Sell : ${state.isBuy ? 'Buy' : 'Sell'}\nAmount : ${state.amount} ${state.jettons[1-state.mainCoin]} \nPrice : ${state.price} ${state.jettons[state.mainCoin]}`, 
                 {
                     reply_markup:{
                     inline_keyboard:[[

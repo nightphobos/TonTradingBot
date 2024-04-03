@@ -9,9 +9,13 @@ import { addOrderingDataToUser, createUser, getPools, getPoolWithCaption, getUse
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
 import { fetchDataGet, Jetton, walletAsset } from './dedust/api';
+import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
+import { TonClient4, WalletContractV4 } from 'ton';
+import { dealOrder } from './dedust/dealOrder';
 let tonWeb = new TonWeb();
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
+const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
 
 export const commandCallback = {
     tradingCallback:handleTradingCallback,
@@ -110,7 +114,6 @@ async function handleTradingCallback (query: CallbackQuery){
 }
 
 export async function handleStartCommand (msg: TelegramBot.Message)  {
-    
     //update / create user info
     const userId = msg.chat?.id ?? 0;
     let prevUser = await getUserByTelegramID(userId);
@@ -132,20 +135,32 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
         }
     else {
         //create a new wallet
-        const keyPair = nacl.sign.keyPair();
-        let wallet = tonWeb.wallet.create({ publicKey: keyPair.publicKey, wc: 0 });
-        const address = await wallet.getAddress();
-        const seqno = await wallet.methods.seqno().call();
-        const deploy = wallet.deploy(keyPair.secretKey);
-        const deployFee = await deploy.estimateFee();
-        const deploySended = await deploy.send();
-        const deployQuery = await deploy.getQuery();
+        // const keyPair = nacl.sign.keyPair();
+        // let wallet = tonWeb.wallet.create({ publicKey: keyPair.publicKey, wc: 0 });
+        // const address = await wallet.getAddress();
+        // const seqno = await wallet.methods.seqno().call();
+        // const deploy = wallet.deploy(keyPair.secretKey);
+        // const deployFee = await deploy.estimateFee();
+        // const deploySended = await deploy.send();
+        // const deployQuery = await deploy.getQuery();
         //save in db
+        let mnemonics = await mnemonicNew();
+        let keyPair = await mnemonicToPrivateKey(mnemonics);
+        // Create wallet contract
+        let workchain = 0; 
+        // Usually you need a workchain 0
+        const wallet = tonClient.open(
+            WalletContractV4.create({
+                workchain: 0,
+                publicKey: keyPair!.publicKey
+            })
+        );
+        const address = wallet.address;
         let newUser: User = {
             telegramID: msg.chat!.id,
-            walletAddress: address.toString(true,true,false),
-            secretKey: keyPair.secretKey.toString(),
-            publicKey: keyPair.publicKey.toString(),
+            walletAddress: address.toString(),
+            secretKey: mnemonics.join(','),
+            publicKey: '',
             state:{
                 state: 'idle',
                 jettons: ['',''],
@@ -157,7 +172,7 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
         };
         await createUser(newUser);
         //save in variable to show
-        telegramWalletAddress = address.toString(true,true,false);
+        telegramWalletAddress = address.toString();
     }
     bot.sendMessage(
         msg.chat.id,
@@ -203,7 +218,7 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
             connector.wallet!.device.appName;
         await bot.sendMessage(
             chatId,
-            `🔗 Connect Wallet\n\nYou have already connect ${connectedName} wallet\nYour address: ${toUserFriendlyAddress(
+            `🔗 Connect Wallet\n\n💡You have already connect ${connectedName} wallet\nYour address: ${toUserFriendlyAddress(
                 connector.wallet!.account.address,
                 connector.wallet!.account.chain === CHAIN.MAINNET
             )}\n\n Disconnect wallet firstly to connect a new one`,{
@@ -275,7 +290,7 @@ export async function handleSendTXCommand(msg: TelegramBot.Message): Promise<voi
 
     await connector.restoreConnection();
     if (!connector.connected) {
-        await bot.sendMessage(chatId, 'Connect wallet to deposit');
+        await bot.sendMessage(chatId, '💡Connect wallet to deposit');
         return;
     }
 
@@ -294,20 +309,20 @@ export async function handleSendTXCommand(msg: TelegramBot.Message): Promise<voi
         Number(process.env.DELETE_SEND_TX_MESSAGE_TIMEOUT_MS)
     )
         .then(() => {
-            bot.sendMessage(chatId, `Transaction sent successfully`);
+            bot.sendMessage(chatId, `💡Transaction sent successfully`);
         })
         .catch(e => {
             if (e === pTimeoutException) {
-                bot.sendMessage(chatId, `Transaction was not confirmed`);
+                bot.sendMessage(chatId, `💡Transaction was not confirmed`);
                 return;
             }
 
             if (e instanceof UserRejectsError) {
-                bot.sendMessage(chatId, `You rejected the transaction`);
+                bot.sendMessage(chatId, `💡You rejected the transaction`);
                 return;
             }
 
-            bot.sendMessage(chatId, `Unknown error happened`);
+            bot.sendMessage(chatId, `💡Unknown error happened`);
         })
         .finally(() => connector.pauseConnection());
 
@@ -344,7 +359,7 @@ export async function handleDisconnectCommand(msg: TelegramBot.Message): Promise
 
     await connector.restoreConnection();
     if (!connector.connected) {
-        await bot.sendMessage(chatId, "✂ Disconnect Wallet\n\nYou didn't connect a wallet",{
+        await bot.sendMessage(chatId, "✂ Disconnect Wallet\n\n💡You didn't connect a wallet",{
             reply_markup: {
                 inline_keyboard: [
                     [{text:'<< Back', callback_data: 'newStart'}]
@@ -356,7 +371,7 @@ export async function handleDisconnectCommand(msg: TelegramBot.Message): Promise
 
     await connector.disconnect();
 
-    await bot.sendMessage(chatId, '✂ Disconnect Wallet\n\nWallet has been disconnected',{
+    await bot.sendMessage(chatId, '✂ Disconnect Wallet\n\n💡Wallet has been disconnected',{
         reply_markup: {
             inline_keyboard: [
                 [{text:'<< Back', callback_data: 'newStart'}]
@@ -368,13 +383,38 @@ export async function handleDisconnectCommand(msg: TelegramBot.Message): Promise
 export async function handleDepositCommand(query: CallbackQuery){
     const user = await getUserByTelegramID(query.message?.chat!.id!);
 
-    replyMessage(query.message!, `📤 Deposit\n\nYour RewardBot Wallet Address is \n<code>${user?.walletAddress}</code>`,[[{text:'<< Back', callback_data: 'newStart'}]])
+    replyMessage(query.message!, `📤 Deposit\n\n💡Your RewardBot Wallet Address is \n<code>${user?.walletAddress}</code>`,[[{text:'<< Back', callback_data: 'newStart'}]])
 }
 
 export async function handleWithdrawCommand(query: CallbackQuery){
-    const user = await getUserByTelegramID(query.message?.chat!.id!);
+    
+    const user = await getUserByTelegramID(query.message!.chat!.id);
 
-    replyMessage(query.message!, `📤 Withdraw\n\nYour RewardBot Wallet Address is \n<code>${user?.walletAddress}</code>`,[[{text:'<< Back', callback_data: 'newStart'}]])
+    const address = user?.walletAddress;
+    const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`);
+    const assets: Jetton[] = await fetchDataGet('/assets');
+    let outputStr = 'Toncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n';
+    let buttons: InlineKeyboardButton[][] = [[{text:'TON', callback_data:'symbol-with-TON'}]];
+    let counter = 0;
+    balances.map((walletAssetItem) => {
+    
+        const filteredAssets = assets.map((asset) => {
+            if(walletAssetItem.asset.type != 'native')
+                if(asset.address === walletAssetItem.asset.address){
+                    counter ++;
+                    outputStr += asset.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset.decimals) + ' ' + asset.symbol + '\n';
+                    if(buttons[Math.floor(counter/3)])
+                        buttons[Math.floor(counter/3)] = []
+                    buttons[Math.floor(counter/3)]![counter % 3] = {text:asset.symbol, callback_data: 'symbol-with-' + asset.symbol}
+                }
+        });
+    });
+    buttons.push([{text:'<< Back', callback_data: 'newStart'}]);
+    bot.sendMessage(
+        query.message!.chat.id,
+        `📤 Withdraw\n\n💡Please click the coin's button to withdraw\n${outputStr}`,
+        { reply_markup:{ inline_keyboard:buttons }, parse_mode:'HTML' }
+    );
 }
 
 export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promise<void> {
