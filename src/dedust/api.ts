@@ -57,7 +57,7 @@ export async function ton_to_Jetton(sender: Sender, jettonAddress: Address, amou
     if ((await pool.getReadinessStatus()) !== ReadinessStatus.READY) {
         throw new Error('Pool (TON, jetton) does not exist.');
     }
-
+    console.log(pool,amountIn,jettonAddress);
     await tonVault.sendSwap(sender, {
         poolAddress: pool.address,
         amount: (amountIn),
@@ -155,9 +155,12 @@ export async function fetchDataGet(fetchURL: String) {
 
 export async function fetchPrice(amount: number, from: string, to: string){
     if(from == to) return amount;
+    console.log(from,to)
     //console.log({ amount, from, to });
+    if(from != 'native')
     if(from.indexOf('jetton:') + 1)
         from = 'jetton:' + Address.parse(from.replace('jetton:','')).toRawString();
+    if(to != 'native')
     if(to.indexOf('jetton:') + 1)
         to = 'jetton:' + Address.parse(to.replace('jetton:','')).toRawString();
     const res = (await axios.post('https://api.dedust.io/v2/routing/plan', { amount, from, to },{timeout:10000})).data;
@@ -179,6 +182,7 @@ function checkHaveTrendingCoin(pool: Pool){
     else return -1;
 }
 export async function getPair() {
+    console.log("===>Loading started<===")
     let counter = 0;
     //delete pools table
     await deletePoolsCollection();

@@ -90,7 +90,7 @@ async function handleTradingCallback (query: CallbackQuery){
         // });
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
         await bot.editMessageText(
-            `🏃 Trading\n\nPlease type in Jetton's Name`,
+            `🏃 Trading\n\n💡Please type in Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT" or "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
             {
                 message_id: query.message?.message_id,
                 chat_id: query.message?.chat.id

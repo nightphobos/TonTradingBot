@@ -7,6 +7,7 @@ const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' 
 
 
 export async function dealOrder(){
+    console.log('dealing order started')
     const users = await getAllUsers();
     users!.map(async (user) =>{
         let secretKey = [0,0];
@@ -21,10 +22,12 @@ export async function dealOrder(){
                 publicKey: keyPair!.publicKey
             })
         );
+        console.log(keyPair,wallet);
+        return;
         let sender = await wallet.sender(keyPair.secretKey);
         if(user.orderingData)
             user.orderingData!.map(async (order) => {
-                
+                //mainCoin refers to the coin what I have and want to exchange.
                 const pool = await getPoolWithCaption(order.jettons);
                 const mainCoinId : number = order.isBuy ? order.mainCoin : 1 - order.mainCoin;
                 const fromJetton : string = order.jettons[mainCoinId]!;
@@ -35,10 +38,11 @@ export async function dealOrder(){
 
                 //ton_to_jetton case
                 try {
-                    const pricePost = await fetchPrice(10 **  pool!.decimals[1 - mainCoinId]!,  'jetton:'+toAddress, 'jetton:'+fromAddress);
+                    const pricePost = await fetchPrice(10 **  pool!.decimals[1 - mainCoinId]!, pool!.assets[1- mainCoinId]!, pool!.assets[mainCoinId]!);
                     let amountNano = BigInt(10 **  pool!.decimals[1 - mainCoinId]!) * amount;
                     //compare price and send tx , delete document.
                     if(pricePost * (order.isBuy ? 1 : -1) <= order.price * 10 ** pool!.decimals[mainCoinId]! * (order.isBuy ? 1 : -1)){
+                        console.log(wallet.address);
                         if(fromJetton == "TON"){
                             await ton_to_Jetton(sender, Address.parse(toAddress), amountNano);
                         } else if(toJetton == "TON"){
@@ -49,9 +53,11 @@ export async function dealOrder(){
                         deleteOrderingDataFromUser(user.telegramID,order._id!);
                     }
                 } catch (error) {
-                    
+                    console.log(error)
                 }
                 
             })
     })
+    console.log('==>dealing order Finished<==');
+
 }
