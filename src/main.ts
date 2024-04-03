@@ -150,6 +150,7 @@ async function main(): Promise<void> {
 
             let clickedSymbol = '' ;
             //name, symbol, address => symbol
+            
             assets.map( (asset) => {
                 if(asset.address == msg.text 
                     || asset.name.toUpperCase() == msg.text?.toUpperCase() 
