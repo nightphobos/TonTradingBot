@@ -29,7 +29,8 @@
     "ton": "^13.9.0",
     "ton-core": "^0.53.0",
     "ton-crypto": "^3.2.0",
-    "tonweb": "^0.0.64"
+    "tonweb": "^0.0.64",
+    "tonweb-mnemonic": "^1.0.1"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

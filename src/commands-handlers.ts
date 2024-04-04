@@ -181,21 +181,20 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
 👏Welcome to <b>RewardBot</b>.
 <b>RewardBot</b> can provide you with a good trading environment <b>Anytime</b>, <b>Anywhere</b>, <b>Anyone</b> 
 
-Please <b>Connect Wallet</b> to <b>Deposit</b> and <b>Start Trading</b>.
 `,{
-reply_markup:{
-    inline_keyboard:[
-        [{text:'💵 My wallet', callback_data:'showMyWallet'}],
-        [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
-            method: 'tradingCallback'
-        })}],
-        [{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
-        //    [{text:'Deposit', callback_data:'my_wallet'},{text:'Withdraw', callback_data:'my_wallet'}],
-        [{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
-    ]
-},
-parse_mode:'HTML'
-}
+    reply_markup:{
+        inline_keyboard:[
+            [{text:'💵 My wallet', callback_data:'showMyWallet'}],
+            [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
+                method: 'tradingCallback'
+            })}],
+            [{text:'🔨 Tools and Settings', callback_data:'setting'}],
+            //[{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
+            //[{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
+        ]
+    },
+    parse_mode:'HTML'
+    }
     );
 }
 
@@ -282,8 +281,23 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
         newConnectRequestListenersMap.delete(chatId);
     });
 }
-
-
+export async function handleSettingCommand(query: CallbackQuery): Promise<void> {
+    replyMessage(query.message!,`🔨 Tools and Settings\n\n
+    Please <b>Connect Wallet</b> to <b>Deposit</b> and <b>Start Trading</b>.`,
+    [
+        [{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
+        [{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
+        [{text:'🛟 Backup', callback_data:'backup'}],
+        [{text:'<< Back', callback_data:'newStart' }]
+    ])
+}
+export async function handleBackupCommand(query: CallbackQuery): Promise<void> {
+    const user = await getUserByTelegramID(query.message?.chat!.id!);
+    replyMessage(query.message!,`🔨 Tools and Settings\n\n${user?.secretKey}`,
+    [
+        [{text:'<< Back', callback_data:'setting' }]
+    ])
+}
 export async function handleSendTXCommand(msg: TelegramBot.Message): Promise<void> {
     const chatId = msg.chat.id;
 

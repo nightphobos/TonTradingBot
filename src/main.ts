@@ -4,11 +4,13 @@ dotenv.config();
 import { bot } from './bot';
 import { walletMenuCallbacks } from './connect-wallet-menu';
 import {
+    handleBackupCommand,
     handleConnectCommand,
     handleDepositCommand,
     handleDisconnectCommand,
     handleInstanteSwap,
     handleSendTXCommand,
+    handleSettingCommand,
     handleShowMyWalletCommand,
     handleStartCommand,
     handleWithdrawCommand
@@ -18,10 +20,11 @@ import TonWeb from 'tonweb';
 import { Pool, connect, getPoolWithCaption, getUserByTelegramID, updateUserState } from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
 import TelegramBot, { CallbackQuery, InlineKeyboardButton, Message } from 'node-telegram-bot-api';
-import { Jetton, fetchDataGet, getPair } from './dedust/api';
+import { Jetton, fetchDataGet, getPair, sendTon } from './dedust/api';
 import { dealOrder } from './dedust/dealOrder';
 import { replyMessage } from './utils';
 import { getConnector } from './ton-connect/connector';
+import { CHAIN, toUserFriendlyAddress } from '@tonconnect/sdk';
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 
@@ -63,6 +66,12 @@ async function main(): Promise<void> {
                 return;
             case 'instanteSwap':
                 handleInstanteSwap(query);
+                return;
+            case 'setting':
+                handleSettingCommand(query);
+                return;
+            case 'backup':
+                handleBackupCommand(query);
                 return;
             default:
                 break;
@@ -257,7 +266,15 @@ async function main(): Promise<void> {
             if(amount > 0){
                 const connector = getConnector(msg.chat.id);
                 if(connector.connected){
-
+                    if(withSymbol == 'TON'){
+                        sendTon(
+                            user?.secretKey.split(','),
+                            BigInt(amount * 10 ** 9),
+                            toUserFriendlyAddress(
+                                connector.wallet!.account.address,
+                                connector.wallet!.account.chain === CHAIN.MAINNET
+                            ))
+                    }
                 }
             }
         }else{
