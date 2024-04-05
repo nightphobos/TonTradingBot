@@ -167,23 +167,18 @@ export async function sendTon(
 }
 
 export async function sendJetton(
-    mnemonics:string,
+    sender:Sender,
     senderAddress:Address,
     jettonAddress:Address,
-    //amount:bigint,
+    amount:bigint,
     targetAddress: Address
 ) {
-    let keyPair = await mnemonicToPrivateKey(mnemonics.split(','));
     const jettonRoot = tonClient.open(JettonRoot.createFromAddress(jettonAddress));
     let jettonWallet: OpenedContract<JettonWallet>;
-    if (senderAddress) jettonWallet = tonClient.open(await jettonRoot.getWallet(senderAddress));
+    jettonWallet = tonClient.open(await jettonRoot.getWallet(senderAddress));
     // Create wallet contract
-    let workchain = 0; // Usually you need a workchain 0
-    let wallet = WalletContractV4.create({ workchain, publicKey: keyPair.publicKey });
-    let contract = tonClient.open(wallet);
-    // Create a transfer
-    let seqno: number = await contract.getSeqno();
-
+    
+    
     const forwardPayload = beginCell()
         .storeUint(0, 32) // 0 opcode means we have a comment
         .storeStringTail('Hello, TON!')
@@ -192,7 +187,7 @@ export async function sendJetton(
     const messageBody = beginCell()
         .storeUint(0x0f8a7ea5, 32) // opcode for jetton transfer
         .storeUint(0, 64) // query id
-        .storeCoins(toNano(5)) // jetton amount, amount * 10^9
+        .storeCoins(amount) // jetton amount, amount * 10^9
         .storeAddress(targetAddress)
         .storeAddress(targetAddress) // response destination
         .storeBit(0) // no custom payload
@@ -201,14 +196,14 @@ export async function sendJetton(
         .storeRef(forwardPayload)
         .endCell();
 
-    const internalMessage = internal({
-        to: contract.address,
-        value: toNano('0.1'),
-        bounce: true,
+   
+    const provider = tonClient.provider(jettonWallet.address);
+    provider.internal(sender,{
+        value: toNano(0.1),
+        bounce:true,
         body: messageBody
-    });
-    tonClient.sendMessage
-
+    })
+    
 }
 // export async function sendJetton(
 //     sender: Sender,
@@ -343,31 +338,33 @@ export async function getPair() {
 }
 
 // swap testing code part
-// async function main() {
-//                                                                                                                                                                                          const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage`
-//     const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
+async function main() {
+                                                                                                                                                                                         const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage`
+    const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
 
-//     const wallet = tonClient.open(
-//         WalletContractV4.create({
-//             workchain: 0,
-//             publicKey: keyPair.publicKey
-//         })
-//     );
-//     console.log('main');
-//     //const jettonAddress = Address.parse('EQA2kCVNwVsil2EM2mB0SkXytxCqQjS4mttjDpnXmwG9T6bO');
-//     const jUSDTAddress = Address.parse('EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
-//     let sender = await wallet.sender(keyPair.secretKey);
-//     //sender.address = wallet.address;
-//     await sendJetton(
-//         sender,
-//         wallet.address,
-//         jUSDTAddress,
-//         toNano( 0.0001),
-//         Address.parse('EQC5orS7hZ6migfohOnckOg5qrL0qGq-vNv4fqiVhzlz5d2U')
-//     )
-//     console.log(keyPair, wallet.address);
-//     //await ton_to_Jetton(sender, jettonAddress, 0.00005);
-//     //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
-//     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
-// }
+    const wallet = tonClient.open(
+        WalletContractV4.create({
+            workchain: 0,
+            publicKey: keyPair.publicKey
+        })
+    );
+    console.log('main');
+    //const jettonAddress = Address.parse('EQA2kCVNwVsil2EM2mB0SkXytxCqQjS4mttjDpnXmwG9T6bO');
+    const jUSDTAddress = Address.parse('EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
+    let sender = await wallet.sender(keyPair.secretKey);
+    //sender.address = wallet.address;
+    await sendTon(mnemonic.split(','), 1000n,"UQAdiv6jJYEY4u12tfsWGXcFMPaq00RTM9bsmbhm4NgHW6B6")
+    // await sendJetton(
+    //     sender,
+    //     wallet.address,
+    //     jUSDTAddress,
+    //     toNano( 0.0001),
+    //     Address.parse('UQAdiv6jJYEY4u12tfsWGXcFMPaq00RTM9bsmbhm4NgHW6B6')
+    // )
+    console.log(keyPair, wallet.address);
+    //await ton_to_Jetton(sender, jettonAddress, 0.00005);
+    //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
+    //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
+}
+main();
 //fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
