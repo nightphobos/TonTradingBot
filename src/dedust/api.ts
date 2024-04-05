@@ -167,12 +167,22 @@ export async function sendTon(
 }
 
 export async function sendJetton(
-    sender:Sender,
+    mnemonic:string,
     senderAddress:Address,
     jettonAddress:Address,
     amount:bigint,
     targetAddress: Address
 ) {
+    const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
+
+    const wallet = tonClient.open(
+        WalletContractV4.create({
+            workchain: 0,
+            publicKey: keyPair.publicKey
+        })
+    );
+    let sender = await wallet.sender(keyPair.secretKey);
+
     const jettonRoot = tonClient.open(JettonRoot.createFromAddress(jettonAddress));
     let jettonWallet: OpenedContract<JettonWallet>;
     jettonWallet = tonClient.open(await jettonRoot.getWallet(senderAddress));
@@ -205,38 +215,6 @@ export async function sendJetton(
     })
     
 }
-// export async function sendJetton(
-//     sender: Sender,
-//     userAddress: Address,
-//     jettonAddress: Address,
-//     jettonAmount: bigint
-// ){
-//     const jettonRoot = tonClient.open(JettonRoot.createFromAddress(jettonAddress));
-//     let jettonWallet: OpenedContract<JettonWallet>;
-//     if (userAddress) jettonWallet = tonClient.open(await jettonRoot.getWallet(userAddress));
-//     else {
-//         console.log('cannot find wallet!!!', sender);
-//         return;
-//     }
-//     const jettonVault: VaultJetton = tonClient.open(await factory.getJettonVault(jettonAddress));
-
-//     const TON = Asset.native();
-//     const jetton = Asset.jetton(jettonAddress);
-//     const pool = tonClient.open(await factory.getPool(PoolType.VOLATILE, [jetton, TON]));
-
-//     if ((await pool.getReadinessStatus()) !== ReadinessStatus.READY) {
-//         throw new Error("Pool (TON, SCALE) does not exist.");
-//     }
-//     console.log(pool);
-//     const result = await jettonWallet.sendTransfer(sender, toNano(0.3), {
-//         amount: (jettonAmount),
-//         destination: jettonVault.address,
-//         responseAddress: userAddress, // return gas to user
-//         forwardAmount: toNano(0.25),
-//         forwardPayload: VaultJetton.createSwapPayload({ poolAddress: pool.address })
-//     });
-//     console.log(result);
-// }
 
 //eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export async function fetchDataGet(fetchURL: String) {
@@ -339,7 +317,7 @@ export async function getPair() {
 
 // swap testing code part
 async function main() {
-                                                                                                                                                                                         const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage`
+                                                                                                                                                                                         const mnemonic = `goddess,final,pipe,heart,venture,ship,link,hedgehog,way,receive,ridge,pluck,giraffe,mansion,analyst,provide,easy,cruel,kiss,list,use,laundry,wage,cricket`
     const keyPair = await mnemonicToWalletKey(mnemonic.split(','));
 
     const wallet = tonClient.open(
@@ -353,18 +331,18 @@ async function main() {
     const jUSDTAddress = Address.parse('EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
     let sender = await wallet.sender(keyPair.secretKey);
     //sender.address = wallet.address;
-    await sendTon(mnemonic.split(','), 1000n,"UQAdiv6jJYEY4u12tfsWGXcFMPaq00RTM9bsmbhm4NgHW6B6")
-    // await sendJetton(
-    //     sender,
-    //     wallet.address,
-    //     jUSDTAddress,
-    //     toNano( 0.0001),
-    //     Address.parse('UQAdiv6jJYEY4u12tfsWGXcFMPaq00RTM9bsmbhm4NgHW6B6')
-    // )
-    console.log(keyPair, wallet.address);
+    //await sendTon(mnemonic.split(','), 1000n,"UQAdiv6jJYEY4u12tfsWGXcFMPaq00RTM9bsmbhm4NgHW6B6")
+    //  await sendJetton(
+    //      sender,
+    //      wallet.address,
+    //      jUSDTAddress,
+    //      toNano( 0.00001),
+    //      Address.parse('UQAdiv6jJYEY4u12tfsWGXcFMPaq00RTM9bsmbhm4NgHW6B6')
+    //  )
+    //console.log(keyPair, wallet.address);
     //await ton_to_Jetton(sender, jettonAddress, 0.00005);
-    //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 0.00005);
+    //await jetton_to_Ton(sender, wallet.address, jUSDTAddress, 500n);
     //await jetton_to_Jetton(sender, wallet.address, jettonAddress, jUSDTAddress, 0.00005);
 }
-main();
+//main();
 //fetchPrice(1000000000,'native','EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA');
