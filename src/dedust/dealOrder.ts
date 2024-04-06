@@ -31,8 +31,7 @@ export async function dealOrder(){
                 const fromAddress : string = pool!.assets[mainCoinId]!.replace('jetton:','');
                 const toJetton : string = order.jettons[1- mainCoinId]!;
                 const toAddress : string = pool!.assets[1- mainCoinId]!.replace('jetton:','');
-                const amount = BigInt( 10 ** pool!.decimals[1 - mainCoinId]! * order.amount);
-
+                const amount = BigInt( 10 ** pool!.decimals[ mainCoinId ]! * order.amount * pool?.prices[1 - mainCoinId]! / pool?.prices[mainCoinId]!);//unit in ton fo rton=>jetto
                 //ton_to_jetton case
                 try {
                     console.log('start tx');

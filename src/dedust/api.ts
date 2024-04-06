@@ -285,10 +285,11 @@ export async function getPair() {
                 if (filteredAssets.length !== 0 || pool.assets[i] === 'native') {
                     if (pool.assets[i] === 'native'){ pool.caption[i] = 'TON'; decimals = 9}
                     else { pool.caption[i] = filteredAssets[0]!.symbol; decimals = filteredAssets[0]?.decimals!} //init caption
-                    const pricePost = await fetchPrice(10 ** decimals,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
+                    const pricePost = await fetchPrice(10 ** decimals * 1000000,  pool.assets[i]!, 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA' );
                     
                     pool.decimals[i] = decimals;
-                    pool.prices[i] = (pricePost * nativePrice / 10 ** 6 )  // price in USD
+                    const price = pricePost * nativePrice / 10 ** 6 /1000000;
+                    pool.prices[i] = Number(price < 1? price.toPrecision(9):price)  // price in USD
                     if(pool.assets[i] == 'jetton:EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA')
                     pool.prices[i] = nativePrice;
                 pool.TVL += (pool.prices[i]! * pool.reserves[i]!);
