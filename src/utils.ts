@@ -1,6 +1,7 @@
 import { encodeTelegramUrlParameters, isTelegramUrl, WalletInfoRemote } from '@tonconnect/sdk';
 import { InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { bot } from './bot';
+import { fetchDataGet, fetchPrice, Jetton } from './dedust/api';
 
 export const AT_WALLET_APP_NAME = 'telegram-wallet';
 
@@ -88,3 +89,31 @@ export async function replyMessage(msg: Message, text: string, inlineButtons?: I
             }
         );
 }
+
+export async function getPriceStr(jettons:string[],mainId:number){
+    let assets: Jetton[] = await fetchDataGet('/assets');
+    let addresses = ['',''];
+    let decimals = [0,0]
+    assets.map((asset) => {
+        if(asset.symbol == jettons[0]){
+            addresses[0] = asset.type == 'native' ? asset.type : 'jetton:' + asset.address
+            decimals[0] = asset.decimals
+
+        }
+
+        if(asset.symbol == jettons[1]){
+            addresses[1] = asset.type == 'native' ? asset.type : 'jetton:' + asset.address
+            decimals[1] = asset.decimals
+
+        }
+    })
+    let price: number = await fetchPrice(10 ** decimals[1-mainId]!, addresses[1 - mainId]!, addresses[mainId]!)
+    price /= 10 ** decimals[mainId]!;
+    
+    const strPrice = price.toFixed(Math.log10(price) <0 ? -1 * Math.ceil(Math.log10(price)) + 2 : 0);
+    console.log(strPrice, addresses)
+    return strPrice;
+}
+(async ()=>{
+    await getPriceStr(['TON','jUSDT'],0);
+}) ()

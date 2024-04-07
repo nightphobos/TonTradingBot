@@ -39,40 +39,50 @@ async function handleAddNewOrder(query: CallbackQuery){
     const walletBalance: walletAsset[] = await fetchDataGet(`/accounts/${user?.walletAddress}/assets`);
     
     
-    walletBalance.map(async (walletasset) => {
-        if(user?.state.isBuy) mainId =  user?.state.mainCoin;
-        else mainId = 1 - user?.state.mainCoin!;
-        const assets: Jetton[] = await fetchDataGet('/assets');
-        assets.map((asset) => {
-            //find wallet asset's symbol => asset.symbol
-            if(asset.address == walletasset.address){
-                //check if the symbol's balance is available
-                if(asset.symbol == user?.state.jettons[mainId]){
-                    flag = true;
-                    if( walletasset.balance < BigInt(user?.state.amount * ( 10 ** pool?.decimals[mainId]!))){
-                        bot.sendMessage(query.message!.chat.id,`Your ${user?.state.jettons[mainId]} balance is not enough!`);
-                        flag = false;
+    
+    console.log(flag);
+    if(user?.state.jettons[mainId] == 'TON')
+        if(walletBalance[0]?.balance! >= user?.state.amount) {
+            await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
+            bot.sendMessage(query.message!.chat.id,`New Order is Succesfuly booked, Press /start`);
+        }
+        else bot.sendMessage(query.message!.chat.id,`New Order is failed due to invalid balance, Press /start`);
+    else{
+        walletBalance.forEach(async (walletasset) => {
+            if(user?.state.isBuy) mainId =  user?.state.mainCoin;
+            else mainId = 1 - user?.state.mainCoin!;
+    
+            const assets: Jetton[] = await fetchDataGet('/assets');
+            
+            assets.forEach(async (asset) => {
+                //find wallet asset's symbol => asset.symbol
+                if(asset.address == walletasset.asset.address && !flag){
+                    //check if the symbol's balance is available
+                    if(asset.symbol == user?.state.jettons[mainId] && !flag){
+                        console.log('#####################', asset.symbol);
+                        flag = true;
+    
+                        if( walletasset.balance < user.state.amount){
+                            bot.sendMessage(query.message!.chat.id,`Your ${user?.state.jettons[mainId]} balance is not enough!  Press /start`);
+                        }else {
+                            await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
+                            bot.sendMessage(query.message!.chat.id,`New Order is Succesfuly booked, Press /start`);
+                        }
+                        
                         return;
                     }
                 }
-            }
+            })
+            if(flag) return;
         })
-    })
-    console.log(walletBalance[0], BigInt(user?.state.amount! * ( 10 ** pool?.decimals[mainId]!)),pool?.decimals[mainId]! ,user?.state.amount! );
-    console.log(user?.state,mainId);
-    if(user?.state.jettons[mainId] == 'TON')
-        if(walletBalance[0]?.balance! >= BigInt(user?.state.amount! * ( 10 ** pool?.decimals[mainId]!))) flag = true;
-        else flag = false;
-    if(flag){
-        await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
-        bot.sendMessage(query.message!.chat.id,`New Order is Succesfuly booked, Press /start`);
     }
-    else {
-        bot.sendMessage(query.message!.chat.id,`New Order is failed due to invalid balance, Press /start`);
-    }
-    //new order added
 }
-
+export async function handleOrderCommand(msg: TelegramBot.Message){
+    let user = await getUserByTelegramID(msg?.chat!.id!);
+    let state = user?.state;
+    state!.state = 'waitfororder';
+    updateUserState(msg?.chat!.id!, state!);
+}
 async function handleTradingCallback (query: CallbackQuery){
     try {
         //update user state string
@@ -418,12 +428,13 @@ export async function handleWithdrawCommand(query: CallbackQuery){
                 if(asset.address === walletAssetItem.asset.address){
                     counter ++;
                     outputStr += asset.name + ' : ' + (Number(walletAssetItem.balance) / 10 ** asset.decimals) + ' ' + asset.symbol + '\n';
-                    if(buttons[Math.floor(counter/3)])
+                    if(buttons[Math.floor(counter/3)] == undefined)
                         buttons[Math.floor(counter/3)] = []
-                    buttons[Math.floor(counter/3)]![counter % 3] = {text:asset.symbol, callback_data: 'with-' + asset.symbol}
+                    buttons[Math.floor(counter/3)]![counter % 3] = {text:asset.symbol, callback_data: 'symbol-with-' + asset.symbol}
                 }
         });
     });
+    console.log(buttons)
     buttons.push([{text:'<< Back', callback_data: 'newStart'}]);
     bot.sendMessage(
         query.message!.chat.id,
