@@ -20,7 +20,6 @@ export async function dealOrder(){
                 publicKey: keyPair!.publicKey
             })
         );
-        console.log(keyPair,wallet,wallet.address.toString());
         let sender = await wallet.sender(keyPair.secretKey);
         if(user.orderingData)
             user.orderingData!.map(async (order) => {
@@ -31,19 +30,18 @@ export async function dealOrder(){
                 const fromAddress : string = pool!.assets[mainCoinId]!.replace('jetton:','');
                 const toJetton : string = order.jettons[1- mainCoinId]!;
                 const toAddress : string = pool!.assets[1- mainCoinId]!.replace('jetton:','');
-                const amount = BigInt( 10 ** pool!.decimals[ mainCoinId ]! * order.amount * pool?.prices[1 - mainCoinId]! / pool?.prices[mainCoinId]!);//unit in ton fo rton=>jetto
+                const amount = BigInt(Math.floor(10 ** pool?.decimals[mainCoinId]! * order.amount));//unit in ton fo rton=>jetto
                 //ton_to_jetton case
                 try {
                     console.log('start tx');
                     const pricePost = await fetchPrice(10 **  pool!.decimals[1 - mainCoinId]!, pool!.assets[1- mainCoinId]!, pool!.assets[mainCoinId]!);
                     //compare price and send tx , delete document.
-                    console.log(wallet.address,fromJetton, amount, amount);
 
                     if(pricePost * (order.isBuy ? 1 : -1) <= order.price * 10 ** pool!.decimals[mainCoinId]! * (order.isBuy ? 1 : -1)){
                         if(fromJetton == "TON"){
                             await ton_to_Jetton(sender, Address.parse(toAddress), amount);
                         } else if(toJetton == "TON"){
-                            await jetton_to_Ton(sender, wallet.address, Address.parse(toAddress), amount);
+                            await jetton_to_Ton(sender, wallet.address, Address.parse(fromAddress), amount);
                         } else {
                             await jetton_to_Jetton(sender, wallet.address, Address.parse(fromAddress), Address.parse(toAddress), amount);
                         }
