@@ -86,15 +86,16 @@ export async function handleOrderCommand(msg: TelegramBot.Message){
     state!.state = 'waitfororder';
     updateUserState(msg?.chat!.id!, state!);
 }
-async function handleTradingCallback (query: CallbackQuery){
+async function handleTradingCallback (query: CallbackQuery, _:string){
     try {
         //update user state string
         
         let user = await getUserByTelegramID(query.message?.chat!.id!);
-        user!.state.state = 'trading';
+        user!.state.state = 'selectPair';
+        user!.state.isBuy = _ == 'true';
+        console.log('trading',_)
         updateUserMode(query.message?.chat!.id!, '');
         updateUserState(query.message?.chat!.id!, user!.state);
-
         //fetch assets from dedust API
         const pools = await getPools();
         const rows = Math.ceil(pools!.length / 4);
@@ -116,7 +117,7 @@ async function handleTradingCallback (query: CallbackQuery){
             }
         )
         await bot.editMessageReplyMarkup(
-            { inline_keyboard: [[{text:'<< Back', callback_data: 'newStart'}]] },
+            { inline_keyboard: [[{text:'<< Back', callback_data: 'symbol-selectPair'}]] },
             {
                 message_id: query.message?.message_id,
                 chat_id: query.message?.chat.id
@@ -135,7 +136,7 @@ export async function handleOrderingBookCommand(query: CallbackQuery){
         orderingBtns[index] = [{text: order.isBuy?'Buy ' + order.jettons[1-order.mainCoin] + ' from ' + order.amount + ' ' + order.jettons[order.mainCoin] + ' at 1' + order.jettons[1- order.mainCoin] + '=' + order.price + ' ' + order.jettons[order.mainCoin]:'Sell '+order.amount + ' ' + order.jettons[1-order.mainCoin] + ' at 1 ' + order.jettons[1- order.mainCoin] + '=' + order.price + ' ' + order.jettons[order.mainCoin]
         ,callback_data: 'orderclick-' + order._id.toHexString()}]
     })
-    orderingBtns.push([{text:'<<back', callback_data:'newStart'}]);
+    orderingBtns.push([{text:'<< Back', callback_data:'symbol-selectPair'}]);
     let state: OrderingData = user?.state!;
     state!.state='ordermanage'
     updateUserState(query.message?.chat.id!,state);
@@ -214,10 +215,7 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
     reply_markup:{
         inline_keyboard:[
             [{text:'💵 My wallet', callback_data:'showMyWallet'}],
-            [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
-                method: 'tradingCallback'
-            })}],
-            [{text:'📕 Ordering Book', callback_data:'orderingBook'}],
+            [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data:'symbol-selectPair'}],
             [{text:'🔨 Tools and Settings', callback_data:'setting'}],
             //[{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
             //[{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
@@ -488,7 +486,7 @@ export async function handleShowMyWalletCommand(msg: TelegramBot.Message): Promi
     const address = user?.walletAddress;
     const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`);
     const assets: Jetton[] = await fetchDataGet('/assets');
-    let outputStr = 'Toncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n';
+    let outputStr = '\nToncoin : ' + (balances[0]?.balance ? (Number(balances[0]?.balance) / 1000000000) : '0') + ' TON\n\n<b>-ALT TOEKN</b>\n';
 
     balances.map((walletAssetItem) => {
     

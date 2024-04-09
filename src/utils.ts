@@ -114,6 +114,6 @@ export async function getPriceStr(jettons:string[],mainId:number){
     console.log(strPrice, addresses)
     return strPrice;
 }
-(async ()=>{
+(async ()=>{ 
     await getPriceStr(['TON','jUSDT'],0);
 }) ()

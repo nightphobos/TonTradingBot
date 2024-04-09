@@ -91,60 +91,22 @@ async function main(): Promise<void> {
         
         //jetton click processing 
         if(query.data.indexOf('symbol-') + 1){
+            
             const clickedSymbol = query.data.replace( 'symbol-', '' );
             let user = await getUserByTelegramID(query.message?.chat!.id!);
             //check user state is trade
-            if( user!.state.state == 'trading' ){
-                user!.state.state = 'selectPair';
-                let selectedPool = await getPoolWithCaption(clickedSymbol.split('/'));
-                user!.state.jettons = clickedSymbol.split('/');
-                user!.state.mainCoin = selectedPool!.main;
+            if( query.data == 'symbol-selectPair'){
+                user!.state.state = 'trading';
+                user!.mode = '';
                 if(user!.mode == '')
                     await replyMessage(query.message!, `🏃 Trading\n\nDo you want to buy/sell?`, [[
-                        {text: 'Buy', callback_data: `symbol-buy`},
-                        {text: 'Sell', callback_data: `symbol-sell`}
+                        {text: '🟢Buy', callback_data: JSON.stringify({ method: 'tradingCallback',data:'true'})},
+                        {text: '🔴Sell', callback_data:  JSON.stringify({ method: 'tradingCallback',data:'false'})},
+                        {text: '📕Active Orders', callback_data: 'orderingBook' }
                     ],[
-                        {text:'<< Back', callback_data:  JSON.stringify({
-                            method: 'tradingCallback'
-                        })}
+                        {text:'<< Back', callback_data:'newStart'}
                     ]] )
-                else 
-                    await replyMessage(query.message!, `♻️ Instant Swap\n\nDo you want to buy/sell?`, [[
-                        {text: 'Buy', callback_data: `symbol-buy`},
-                        {text: 'Sell', callback_data: `symbol-sell`}
-                    ],[
-                        {text:'<< Back', callback_data: 'instanteSwap'}
-                    ]] )
-            }else if ( user!.state.state == 'selectPair' ){
-                let selectedPool = await getPoolWithCaption(user!.state.jettons);
-                let state = user!.state;
-
-                state.state = 'isBuy';
-
-                if(clickedSymbol == 'buy') {
-                    state.isBuy = true 
-                    await replyMessage(query.message!, 
-                        `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[state.mainCoin]!/* 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`*/,
-                        [
-                            [ {text:'Buy 0.1 TON', callback_data: 'symbol-0.1'},{text:'Buy 0.3 TON', callback_data: 'symbol-0.3'} ],
-                            [ {text:'Buy 0.5 TON', callback_data: 'symbol-0.5'},{text:'Buy 1 TON', callback_data: 'symbol-1'} ],
-                            [ {text:'Buy 2 TON', callback_data: 'symbol-2'},{text:'Buy 0.0001 TON', callback_data: 'symbol-0.0001'} ],
-                            [ {text:'<< Back', callback_data: 'newStart'} ]
-                        ]
-                    )
-                }
-                else {
-                    state.isBuy = false;
-                    await replyMessage(query.message!, 
-                        `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[1 - state.mainCoin]/* 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`*/,
-                        [
-                            [ {text:'Sell 5%', callback_data: 'symbol-5'},{text:'Sell 10%', callback_data: 'symbol-10'} ],
-                            [ {text:'Sell 20%', callback_data: 'symbol-20'},{text:'Sell 30%', callback_data: 'symbol-30'} ],
-                            [ {text:'Sell 50%', callback_data: 'symbol-50'},{text:'Sell 100%', callback_data: 'symbol-100'} ],
-                            [ {text:'<< Back', callback_data: 'newStart'} ]
-                        ]
-                    )
-                }
+                
             }else if ( user?.state.state == 'isBuy'){
                 let state = user.state;
                 user.state.state = 'price';
@@ -167,10 +129,10 @@ async function main(): Promise<void> {
                 }
                 const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin);
 
-                await bot.sendMessage(query.message!.chat.id, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
+                await bot.sendMessage(query.message!.chat.id!, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
                 {
                     reply_markup:{
-                        inline_keyboard:[[ {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})} ]]
+                        inline_keyboard:[[ {text:'<< Back', callback_data: 'symbol-selectPair'} ]]
                     }
                 });
             }else if ( clickedSymbol.indexOf('with-') + 1){
@@ -218,10 +180,23 @@ async function main(): Promise<void> {
         let assets: Jetton[] = await fetchDataGet('/assets');
         if(!!!user) return;
         if( user!.state.state == 'trading' ){
-
+            user!.state.state = 'selectPair'
+            if(user!.mode != '')
+                await bot.sendMessage(msg.chat.id!,  `♻️ Instant Swap\n\n💡Which DEX do you want?`,
+                {
+                    reply_markup:{
+                        inline_keyboard:[[
+                            {text: 'Ston.fi', web_app:{url:`https://app.ston.fi/swap?chartVisible=false&chartInterval=1w&ft=${user!.state.jettons[user!.state.mainCoin]}&tt=${user!.state.jettons[1-user!.state.mainCoin]}&fa=1`}},
+                            {text: 'Dedust.io', web_app:{url:'https://dedust.io/swap'}}
+                        ],[
+                            {text:'<< Back', callback_data: 'instanteSwap'}
+                        ]] 
+                    }
+                }); 
+        }else if ( user!.state.state == 'selectPair' ){
             let clickedSymbol = '' ;
             //name, symbol, address => symbol
-            
+            const assets: Jetton[] =  await fetchDataGet('/assets')
             assets.map( (asset) => {
                 if(asset.address == msg.text 
                     || asset.name.toUpperCase() == msg.text?.toUpperCase() 
@@ -231,19 +206,19 @@ async function main(): Promise<void> {
                     )
                     clickedSymbol = 'TON/' + asset.symbol;
             } )
-            let selectedPool = await getPoolWithCaption(clickedSymbol.split('/'));
+            let selectedPool = await getPoolWithCaption(clickedSymbol.split('/'))!;
             if(!selectedPool) {
                 if(user!.mode == '')
-                    await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Please type in the valid Symbol`,
+                    await bot.sendMessage(msg.chat.id!,  `🏃 Trading\n\n💡Please type in the valid Symbol`,
                     {
                         reply_markup:{
                             inline_keyboard:[[
-                                {text:'<< Back', callback_data:  JSON.stringify({ method: 'tradingCallback'})}
+                                {text:'<< Back', callback_data: 'symbol-selectPair'}
                             ]] 
                         }
                     });
                 else
-                    await bot.sendMessage(msg.chat.id,  `♻️ Instant Swap\n\n💡Please type in the valid Symbol`,
+                    await bot.sendMessage(msg.chat.id!,  `♻️ Instant Swap\n\n💡Please type in the valid Symbol`,
                     {
                         reply_markup:{
                             inline_keyboard:[[
@@ -256,44 +231,66 @@ async function main(): Promise<void> {
             user!.state.state = 'selectPair';
             user!.state.jettons = clickedSymbol.split('/');
             user!.state.mainCoin = selectedPool!.main;
-            if(user!.mode == '')
-                await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Do you want to buy/sell?`,
-                {
-                    reply_markup:{
-                        inline_keyboard:[[
-                            {text: '🟢 Buy', callback_data: `symbol-buy`},
-                            {text: '🔴 Sell', callback_data: `symbol-sell`}
-                        ],[
-                            {text:'<< Back', callback_data:  JSON.stringify({ method: 'tradingCallback'})}
-                        ]] 
-                    }
-                }); 
-            else
-                await bot.sendMessage(msg.chat.id,  `♻️ Instant Swap\n\n💡Which DEX do you want?`,
-                {
-                    reply_markup:{
-                        inline_keyboard:[[
-                            {text: 'Ston.fi', web_app:{url:`https://app.ston.fi/swap?chartVisible=false&chartInterval=1w&ft=${user!.state.jettons[user!.state.mainCoin]}&tt=${user!.state.jettons[1-user!.state.mainCoin]}&fa=1`}},
-                            {text: 'Dedust.io', web_app:{url:'https://dedust.io/swap'}}
-                        ],[
-                            {text:'<< Back', callback_data: 'instanteSwap'}
-                        ]] 
-                    }
-                }); 
+            selectedPool = await getPoolWithCaption(user!.state.jettons);
+            let state = user!.state;
+            
+            state.state = 'isBuy';
+            
+            if(state.isBuy) {
+                await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[state.mainCoin],
+                    {
+                        reply_markup:{
+                            inline_keyboard:[
+                                [ {text:'Buy 0.1 TON', callback_data: 'symbol-0.1'},{text:'Buy 0.3 TON', callback_data: 'symbol-0.3'} ],
+                                [ {text:'Buy 0.5 TON', callback_data: 'symbol-0.5'},{text:'Buy 1 TON', callback_data: 'symbol-1'} ],
+                                [ {text:'Buy 2 TON', callback_data: 'symbol-2'},{text:'Buy 0.0001 TON', callback_data: 'symbol-0.0001'} ],
+                                [ {text:'<< Back', callback_data: 'newStart'} ]
+                            ]
+                        }
+                    });
+            }
+            else {
+                await bot.sendMessage(msg.chat.id,  `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[1 - state.mainCoin],
+                    {
+                        reply_markup:{
+                            inline_keyboard:[
+                                [ {text:'Sell 5%', callback_data: 'symbol-5'},{text:'Sell 10%', callback_data: 'symbol-10'} ],
+                                [ {text:'Sell 20%', callback_data: 'symbol-20'},{text:'Sell 30%', callback_data: 'symbol-30'} ],
+                                [ {text:'Sell 50%', callback_data: 'symbol-50'},{text:'Sell 100%', callback_data: 'symbol-100'} ],
+                                [ {text:'<< Back', callback_data: 'newStart'} ]
+                            ]
+                        }
+                    });
+                
+            }
         }else if(user?.state.state == 'isBuy'){
-            user.state.state = 'price';
-            const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin);
+            let state = user.state;
+                user.state.state = 'price';
+                if(state.isBuy){
+                    state.amount = Number(msg.text);
+                }else{
+                    const address = user.walletAddress;
+                    const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`);
+                    const assets: Jetton[] = await fetchDataGet('/assets');
 
-            user.state.amount = Number(msg.text) 
-            
-
-            await bot.sendMessage(msg.chat.id, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
-            {
-                reply_markup:{
-                    inline_keyboard:[[ {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})} ]]
+                    balances.map((walletAssetItem) => {
+                        const filteredAssets = assets.map((asset) => {
+                            if(walletAssetItem.asset.type != 'native')
+                                if(asset.address === walletAssetItem.asset.address && asset.symbol == user?.state.jettons[1-user.state.mainCoin]){
+                                    state.amount = Number(BigInt(walletAssetItem.balance) * BigInt(msg.text!) / BigInt(10 ** asset.decimals * 100));
+                                    console.log("happy boty ====================")
+                                }
+                        });
+                    });
                 }
-            });
-            
+                const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin);
+
+                await bot.sendMessage(msg.chat.id!, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
+                {
+                    reply_markup:{
+                        inline_keyboard:[[ {text:'<< Back', callback_data: 'symbol-selectPair'} ]]
+                    }
+                });
         }else if(user?.state.state == 'price'){
             user.state.price = Number(msg.text);
             user.state.state = 'amount';
@@ -306,9 +303,9 @@ async function main(): Promise<void> {
                         reply_markup:{
                         inline_keyboard:[[
                             {text:'✅I agree', callback_data: JSON.stringify({ method: 'addNewOrder' })},
-                            {text:'🚫I don\'t agree', callback_data: JSON.stringify({ method: 'tradingCallback'})}
+                            {text:'🚫I don\'t agree', callback_data: 'symbol-selectPair'}
                         ],[
-                            {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})}
+                            {text:'<< Back', callback_data: 'symbol-selectPair'}
                         ]]
                         }
                     }
@@ -319,7 +316,7 @@ async function main(): Promise<void> {
                     {
                         reply_markup:{
                         inline_keyboard:[
-                            [{text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})}]
+                            [{text:'<< Back', callback_data: 'symbol-selectPair'}]
                         ]
                         }
                     }
