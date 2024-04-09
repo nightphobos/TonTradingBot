@@ -14,6 +14,11 @@ export function getConnector(
     chatId: number,
     onConnectorExpired?: (connector: TonConnect) => void
 ): TonConnect {
+    try {
+        
+    } catch (error) {
+        
+    }
     let storedItem: StoredConnectorData;
     if (connectors.has(chatId)) {
         storedItem = connectors.get(chatId)!;

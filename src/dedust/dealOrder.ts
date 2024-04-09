@@ -4,7 +4,7 @@ import { Address, TonClient4, WalletContractV4 } from "@ton/ton";
 import { keyPairFromSecretKey, mnemonicToPrivateKey } from "@ton/crypto";
 import { fetchPrice, jetton_to_Jetton, jetton_to_Ton, ton_to_Jetton } from "./api";
 const tonClient = new TonClient4({ endpoint: 'https://mainnet-v4.tonhubapi.com' });
-
+import {bot} from '../bot'
 
 export async function dealOrder(){
     console.log('dealing order started')
@@ -45,7 +45,8 @@ export async function dealOrder(){
                         } else {
                             await jetton_to_Jetton(sender, wallet.address, Address.parse(fromAddress), Address.parse(toAddress), amount);
                         }
-                        deleteOrderingDataFromUser(user.telegramID,order._id!);
+                        bot.sendMessage(user.telegramID, 'TX realised, Visit https://tonviewer.com/' + user.walletAddress);
+                        deleteOrderingDataFromUser(user.telegramID,order!._id);
                     }
                 } catch (error) {
                     console.log(error)
@@ -54,5 +55,6 @@ export async function dealOrder(){
             })
     })
     console.log('==>dealing order Finished<==');
+
 
 }

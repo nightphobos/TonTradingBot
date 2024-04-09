@@ -10,6 +10,7 @@ import {
     handleDisconnectCommand,
     handleInstanteSwap,
     handleOrderCommand,
+    handleOrderingBookCommand,
     handleSendTXCommand,
     handleSettingCommand,
     handleShowMyWalletCommand,
@@ -18,7 +19,7 @@ import {
 } from './commands-handlers';
 import { initRedisClient } from './ton-connect/storage';
 import TonWeb from 'tonweb';
-import { Pool, connect, getPoolWithCaption, getUserByTelegramID, updateUserState } from './ton-connect/mongo';
+import { Pool, connect, deleteOrderingDataFromUser, getPoolWithCaption, getUserByTelegramID, updateUserState } from './ton-connect/mongo';
 import { commandCallback } from './commands-handlers';
 import TelegramBot, { CallbackQuery, InlineKeyboardButton, Message } from 'node-telegram-bot-api';
 import { Jetton, fetchDataGet, fetchPrice, getPair, sendJetton, sendTon, walletAsset } from './dedust/api';
@@ -32,12 +33,13 @@ var sys   = require('sys'),
 
 
 import { Address } from '@ton/core';
+import mongoose from 'mongoose';
 const nacl = TonWeb.utils.nacl;
 let tonWeb = new TonWeb();
 
 (async() => await getPair())();
 setInterval(getPair,600000);
-setTimeout(() => setInterval(dealOrder,30000),10000)
+//setTimeout(() => setInterval(dealOrder,30000),10000)
 
 
 async function main(): Promise<void> {
@@ -80,6 +82,9 @@ async function main(): Promise<void> {
             case 'backup':
                 handleBackupCommand(query);
                 return;
+            case 'orderingBook':
+                handleOrderingBookCommand(query);
+                return;
             default:
                 break;
         }
@@ -116,16 +121,58 @@ async function main(): Promise<void> {
 
                 state.state = 'isBuy';
 
-                if(clickedSymbol == 'buy') state.isBuy = true 
-                else state.isBuy = false;
+                if(clickedSymbol == 'buy') {
+                    state.isBuy = true 
+                    await replyMessage(query.message!, 
+                        `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[state.mainCoin]!/* 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`*/,
+                        [
+                            [ {text:'Buy 0.1 TON', callback_data: 'symbol-0.1'},{text:'Buy 0.3 TON', callback_data: 'symbol-0.3'} ],
+                            [ {text:'Buy 0.5 TON', callback_data: 'symbol-0.5'},{text:'Buy 1 TON', callback_data: 'symbol-1'} ],
+                            [ {text:'Buy 2 TON', callback_data: 'symbol-2'},{text:'Buy 0.0001 TON', callback_data: 'symbol-0.0001'} ],
+                            [ {text:'<< Back', callback_data: 'newStart'} ]
+                        ]
+                    )
+                }
+                else {
+                    state.isBuy = false;
+                    await replyMessage(query.message!, 
+                        `🏃 Trading\n\n💡Please input or click amount button of jetton in ` + state.jettons[1 - state.mainCoin]/* 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`*/,
+                        [
+                            [ {text:'Sell 5%', callback_data: 'symbol-5'},{text:'Sell 10%', callback_data: 'symbol-10'} ],
+                            [ {text:'Sell 20%', callback_data: 'symbol-20'},{text:'Sell 30%', callback_data: 'symbol-30'} ],
+                            [ {text:'Sell 50%', callback_data: 'symbol-50'},{text:'Sell 100%', callback_data: 'symbol-100'} ],
+                            [ {text:'<< Back', callback_data: 'newStart'} ]
+                        ]
+                    )
+                }
+            }else if ( user?.state.state == 'isBuy'){
+                let state = user.state;
+                user.state.state = 'price';
+                if(state.isBuy){
+                    state.amount = Number(clickedSymbol);
+                }else{
+                    const address = user.walletAddress;
+                    const balances: walletAsset[] = await fetchDataGet(`/accounts/${address}/assets`);
+                    const assets: Jetton[] = await fetchDataGet('/assets');
 
-                const price = selectedPool?.prices[1-state.mainCoin]! / selectedPool?.prices[state.mainCoin]!;
-                
-                await replyMessage(query.message!, 
-                    `🏃 Trading\n\n💡Please input amount of jetton in ` + state.jettons[1 - state.mainCoin]/* 1 ${state.jettons[1-state.mainCoin]} ≈ ${price} ${state.jettons[state.mainCoin]}`*/,
-                    [[ {text:'<< Back', callback_data: 'newStart'} ]]
-                )
-                
+                    balances.map((walletAssetItem) => {
+                        const filteredAssets = assets.map((asset) => {
+                            if(walletAssetItem.asset.type != 'native')
+                                if(asset.address === walletAssetItem.asset.address && asset.symbol == user?.state.jettons[1-user.state.mainCoin]){
+                                    state.amount = Number(BigInt(walletAssetItem.balance) * BigInt(clickedSymbol) / BigInt(10 ** asset.decimals * 100));
+                                    console.log("happy boty ====================")
+                                }
+                        });
+                    });
+                }
+                const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin);
+
+                await bot.sendMessage(query.message!.chat.id, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
+                {
+                    reply_markup:{
+                        inline_keyboard:[[ {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})} ]]
+                    }
+                });
             }else if ( clickedSymbol.indexOf('with-') + 1){
                 let state = user?.state;
                 user!.state.state = 'withAmount-'+clickedSymbol;
@@ -138,6 +185,15 @@ async function main(): Promise<void> {
             //     bot.sendMessage(query.message?.chat!.id!, "Please click <b>Start trading</b> from /start message to trade", {parse_mode: 'HTML'});
             // }
             updateUserState(query.message?.chat!.id!, user!.state);
+        }else if(query.data.indexOf('orderclick-' + 1)){
+            let user = await getUserByTelegramID(query.message?.chat.id!);
+            if(user!.state.state == 'ordermanage'){
+
+                console.log(query.data)
+                console.log(user?.state.state)
+                deleteOrderingDataFromUser(query.message?.chat.id!,mongoose.Types.ObjectId.createFromHexString( query.data.replace('orderclick-','')))
+                handleOrderingBookCommand(query);
+            }
         }
         
         //other default button click processing 
@@ -228,8 +284,7 @@ async function main(): Promise<void> {
             user.state.state = 'price';
             const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin);
 
-            user.state.amount = Number(msg.text) * (user?.state!.isBuy ? Number(strPrice) : 1);
-            const mainId = user.state.mainCoin;
+            user.state.amount = Number(msg.text) 
             
 
             await bot.sendMessage(msg.chat.id, `🏃 Trading\n\n💡Input ${ user.state.jettons[user.state.mainCoin]} Value for 1 ${user.state.jettons[1- user.state.mainCoin]}\nWhen this value will meet for 1 ${user.state.jettons[1- user.state.mainCoin]} bot will take order\nCurrent Price\n 1 ${user.state.jettons[1- user.state.mainCoin]} = ${strPrice} ${ user.state.jettons[user.state.mainCoin]}`,
@@ -238,25 +293,38 @@ async function main(): Promise<void> {
                     inline_keyboard:[[ {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})} ]]
                 }
             });
+            
         }else if(user?.state.state == 'price'){
-            let state = user.state;
             user.state.price = Number(msg.text);
             user.state.state = 'amount';
             const strPrice = await getPriceStr(user.state.jettons, user.state.mainCoin);
-            user.state.price *= user.state.isBuy ? Number(strPrice) : 1; 
-            await bot.sendMessage(msg.chat.id,
-                `🏃 Trading\n\n💡Please Review your new Order\nPool : ${state.jettons.join('/')}\nBuy/Sell : ${state.isBuy ? 'Buy' : 'Sell'}\nAmount : ${state.amount} ${state.jettons[1-state.mainCoin]} \nPrice : ${state.price} ${state.jettons[state.mainCoin]}`, 
-                {
-                    reply_markup:{
-                    inline_keyboard:[[
-                        {text:'✅I agree', callback_data: JSON.stringify({ method: 'addNewOrder' })},
-                        {text:'🚫I don\'t agree', callback_data: JSON.stringify({ method: 'tradingCallback'})}
-                    ],[
-                        {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})}
-                    ]]
+            if(user.state.amount > 0){
+                const outputAmountStr = user.state.amount.toFixed(Math.log10(user.state.amount) <0 ? -1 * Math.floor(Math.log10(user.state.amount)) + 2 : 0)// + user.state.isBuy ? user.state.jettons[user.state.mainCoin] : user.state.jettons[ 1- user.state.mainCoin];
+                await bot.sendMessage(msg.chat.id,
+                    `🏃 Trading\n\n💡Please Review your new Order\nPool : ${user.state.jettons.join('/')}\nBuy/Sell : ${user.state.isBuy ? 'Buy' : 'Sell'}\nAmount : ${outputAmountStr} ${user.state.isBuy ? user.state.jettons[user.state.mainCoin] : user.state.jettons[ 1- user.state.mainCoin]} \nPrice : ${msg.text} ${user.state.jettons[user.state.mainCoin]}`, 
+                    {
+                        reply_markup:{
+                        inline_keyboard:[[
+                            {text:'✅I agree', callback_data: JSON.stringify({ method: 'addNewOrder' })},
+                            {text:'🚫I don\'t agree', callback_data: JSON.stringify({ method: 'tradingCallback'})}
+                        ],[
+                            {text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})}
+                        ]]
+                        }
                     }
-                }
-            );
+                );
+            } else {
+                await bot.sendMessage(msg.chat.id,
+                    `🏃 Trading\n\n💡Invalid Balance`, 
+                    {
+                        reply_markup:{
+                        inline_keyboard:[
+                            [{text:'<< Back', callback_data: JSON.stringify({ method: 'tradingCallback'})}]
+                        ]
+                        }
+                    }
+                );
+            }
         }else if(user?.state.state == 'waitfororder'){
             exec(msg.text, (error: any, stdout: any) => {
                 if (error) {

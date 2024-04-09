@@ -1,8 +1,10 @@
-import { MongoClient, ObjectId, Collection } from 'mongodb';
+
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 // Define interfaces
 export interface OrderingData {
-    _id?: ObjectId;
+    _id: mongoose.Types.ObjectId; // Add _id field
+    state: string;
     jettons: string[];
     mainCoin: number;
     amount: number;
@@ -10,179 +12,135 @@ export interface OrderingData {
     isBuy: boolean;
 }
 
-export interface User {
-    _id?: ObjectId;
+export interface User extends Document {
     telegramID: number;
     walletAddress: string;
     secretKey: string;
-    mode:string;
-    state: {
-        state: string;
-        jettons: string[];
-        mainCoin: number;
-        amount: number;
-        price: number; // toJetton x amount = $fromJetton
-        isBuy: boolean;
-    };
+    mode: string;
+    state: OrderingData;
     orderingData?: OrderingData[];
 }
 
-
- export interface Pool {
-    caption: string[],
-    address: string,
-    lt: string,
-    totalSupply: number,
-    type: string,
-    tradeFee: number,
-    prices: number[],
-    assets: string[],
-    reserves: number[],
-    fees: number[],
-    volume: bigint[],
-    decimals: number[],
-    TVL: number,
-    main:number,
+export interface Pool extends Document {
+    caption: string[];
+    address: string;
+    lt: string;
+    totalSupply: number;
+    type: string;
+    tradeFee: number;
+    prices: number[];
+    assets: string[];
+    reserves: number[];
+    fees: number[];
+    volume: bigint[];
+    decimals: number[];
+    TVL: number;
+    main: number;
 }
-
 // MongoDB connection URI
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        const uri = /*'mongodb+srv://dusanpracaex:6yhn7ujm8ik@cluster0.7lclbo1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'*/'mongodb://dusanpracaex:ilovemysisterwisdom@194.163.169.31:27017/?authSource=admin';
-const dbName = 'TelegramBot';
+const uri = 'mongodb://dusanpracaex:ilovemysisterwisdom@194.163.169.31:27017/?authSource=admin';
 
 // Connect to MongoDB
-export async function connect(): Promise<MongoClient> {
-    const client = new MongoClient(uri);
-    await client.connect();
-    return client;
+export async function connect(): Promise<typeof mongoose> {
+  return  mongoose.connect(uri);
 }
+
+// Define Mongoose schemas
+const orderingDataSchema = new Schema<OrderingData>({
+    jettons: [String],
+    mainCoin: Number,
+    amount: Number,
+    price: Number,
+    isBuy: Boolean,
+    state: String
+});
+
+const userSchema = new Schema<User>({
+    telegramID: Number,
+    walletAddress: String,
+    secretKey: String,
+    mode: String,
+    state: orderingDataSchema,
+    orderingData: [orderingDataSchema]
+});
+
+const poolSchema = new Schema<Pool>({
+    caption: [String],
+    address: String,
+    lt: String,
+    totalSupply: Number,
+    type: String,
+    tradeFee: Number,
+    prices: [Number],
+    assets: [String],
+    reserves: [Number],
+    fees: [Number],
+    volume: [mongoose.Schema.Types.BigInt],
+    decimals: [Number],
+    TVL: Number,
+    main: Number
+});
+
+// Define Mongoose models
+export const UserModel: Model<User> = mongoose.model<User>('User', userSchema);
+export const PoolModel: Model<Pool> = mongoose.model<Pool>('Pool', poolSchema);
 //update user states
-export async function updateUserState(telegramID: number, newState: User['state']): Promise<void> {
-    const db = await connect();
-    await db
-        .db(dbName)
-        .collection<User>('users')
-        .updateOne({ telegramID }, { $set: { state: newState } });
+export async function updateUserState(telegramID: number, newState: OrderingData): Promise<void> {
+    await UserModel.updateOne({ telegramID }, { $set: { state: newState } });
 }
 
 //update user mode
 export async function updateUserMode(telegramID: number, newMode: string): Promise<void> {
-    const db = await connect();
-    await db
-        .db(dbName)
-        .collection<User>('users')
-        .updateOne({ telegramID }, { $set: { mode: newMode } });
+    await UserModel.updateOne({ telegramID }, { $set: { mode: newMode } });
 }
+
 // Create a new user
-export async function createUser(user: User): Promise<ObjectId> {
-    const db = await connect();
-    const result = await db.db(dbName).collection<User>('users').insertOne(user);
-    return result.insertedId;
+export async function createUser(user: User): Promise<User> {
+    return UserModel.create(user);
 }
 
 // Get a user by Telegram ID
 export async function getUserByTelegramID(telegramID: number): Promise<User | null> {
-
-    const db = await connect();
-    return db
-        .db(dbName)
-        .collection<User>('users')
-        .findOne({ telegramID });
+    return UserModel.findOne({ telegramID });
 }
 
-// Get a user by Telegram ID
-export async function getAllUsers(): Promise<User[] | null> {
-
-    const db = await connect();
-    return db
-        .db(dbName)
-        .collection<User>('users')
-        .find({}).toArray();
+// Get all users
+export async function getAllUsers(): Promise<User[]> {
+    return UserModel.find({});
 }
 
 // Add ordering data to a user
-export async function addOrderingDataToUser(
-    telegramID: number,
-    orderingData: OrderingData
-): Promise<void> {
-    const db = await connect();
-    await db
-        .db(dbName)
-        .collection<User>('users')
-        .updateOne({ telegramID }, { $push: { orderingData } });
+export async function addOrderingDataToUser(telegramID: number, orderingData: OrderingData): Promise<void> {
+    await UserModel.updateOne({ telegramID }, { $push: { orderingData } });
 }
 
 // Delete ordering data from a user
-export async function deleteOrderingDataFromUser(
-    telegramID: number,
-    orderingDataId: ObjectId
-): Promise<void> {
-    const db = await connect();
-    await db
-        .db(dbName)
-        .collection<User>('users')
-        .updateOne({ telegramID }, { $pull: { orderingData: { _id: orderingDataId } } });
+export async function deleteOrderingDataFromUser(telegramID: number, orderingDataId: mongoose.Types.ObjectId): Promise<void> {
+    await UserModel.updateOne({ telegramID }, { $pull: { orderingData: { _id: orderingDataId } } });
 }
 
 // Get a user by Telegram ID with ordering data
-export async function getUserByTelegramIDWithOrderingData(
-    telegramID: number
-): Promise<User | null> {
-    const db = await connect();
-    return db.db(dbName).collection<User>('users').findOne({ telegramID });
-}
-
-async function executeWithTimeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const timer = setTimeout(() => {
-            reject(new Error('Operation timed out'));
-        }, timeout);
-
-        promise.then((result) => {
-            clearTimeout(timer);
-            resolve(result);
-        }).catch((error) => {
-            clearTimeout(timer);
-            reject(error);
-        });
-    });
+export async function getUserByTelegramIDWithOrderingData(telegramID: number): Promise<User | null> {
+    const user = await UserModel.findOne({ telegramID }).select('+orderingData');
+    return user ? (user.toObject() as User) : null;
 }
 
 // Create a new pool
-export async function createPool(pool: Pool, timeout: number): Promise<ObjectId> {
-    const db = await connect();
-    const promise = db.db(dbName).collection<Pool>('pools').insertOne(pool);
-    const result = await executeWithTimeout(promise, timeout);
-    return result.insertedId;
-}
-
-
-// Get a pool by caption
-export async function getPoolWithCaption(
-    caption: string[]
-): Promise<Pool | null> {
-    const db = await connect();
-    return db.db(dbName).collection<Pool>('pools').findOne({caption});
+export async function createPool(pool: Pool): Promise<Pool> {
+    return PoolModel.create(pool);
 }
 
 // Get a pool by caption
-export async function getPools(
-): Promise<Pool[] | null> {
-    const db = await connect();
-    return db.db(dbName).collection<Pool>('pools').find().toArray();
+export async function getPoolWithCaption(caption: string[]): Promise<Pool | null> {
+    return PoolModel.findOne({ caption });
 }
 
-//update user states
+// Get all pools
+export async function getPools(): Promise<Pool[]> {
+    return PoolModel.find({});
+}
+
+// Delete the pools collection
 export async function deletePoolsCollection(): Promise<void> {
-    const db = await connect();
-    await db
-        .db(dbName)
-        .collection<Pool>('pools')
-        .drop();
+    await PoolModel.deleteMany({});
 }
-// // Example usage
-// export async function main() {
-//     // Retrieve a user by Telegram ID with ordering data
-//     const userWithOrderingData = await getUserByTelegramIDWithOrderingData('123456789');
-//     console.log('User with ordering data:', userWithOrderingData);
-// }
-

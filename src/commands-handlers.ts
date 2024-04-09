@@ -4,14 +4,15 @@ import { getWallets, getWalletInfo } from './ton-connect/wallets';
 import QRCode from 'qrcode';
 import TelegramBot, { CallbackQuery, InlineKeyboardButton,Message } from 'node-telegram-bot-api';
 import { getConnector } from './ton-connect/connector';
-import { addTGReturnStrategy, buildUniversalKeyboard, pTimeout, pTimeoutException , replyMessage} from './utils';
-import { addOrderingDataToUser, createUser, getPools, getPoolWithCaption, getUserByTelegramID, OrderingData, updateUserMode, updateUserState,User } from './ton-connect/mongo';
+import { addTGReturnStrategy, buildUniversalKeyboard, getPriceStr, pTimeout, pTimeoutException , replyMessage} from './utils';
+import { addOrderingDataToUser, createUser, getPools, getPoolWithCaption, getUserByTelegramID, OrderingData, updateUserMode, updateUserState,User, UserModel } from './ton-connect/mongo';
 import TonWeb from 'tonweb';
 import nacl from 'tweetnacl';
 import { fetchDataGet, Jetton, walletAsset } from './dedust/api';
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 import { TonClient4, WalletContractV4 } from 'ton';
 import { dealOrder } from './dedust/dealOrder';
+import mongoose, { Callback } from 'mongoose';
 let tonWeb = new TonWeb();
 
 let newConnectRequestListenersMap = new Map<number, () => void>();
@@ -21,16 +22,17 @@ export const commandCallback = {
     tradingCallback:handleTradingCallback,
     addNewOrder:handleAddNewOrder
 }
-
 async function handleAddNewOrder(query: CallbackQuery){
     console.log(query);
     const user = await getUserByTelegramID(query.message?.chat!.id!);
-    let newOrder: OrderingData = {
+    let newOrder = {
+        _id:  new mongoose.Types.ObjectId(),
         amount: user?.state.amount!,
         jettons: user?.state.jettons!,
         mainCoin: user?.state.mainCoin!,
         isBuy: user?.state.isBuy!,
         price: user?.state.price!,
+        state: ''
     };
     //check balance
     
@@ -39,11 +41,12 @@ async function handleAddNewOrder(query: CallbackQuery){
     const walletBalance: walletAsset[] = await fetchDataGet(`/accounts/${user?.walletAddress}/assets`);
     
     
-    
     console.log(flag);
-    if(user?.state.jettons[mainId] == 'TON')
+    if(user?.state.isBuy )
         if(walletBalance[0]?.balance! >= user?.state.amount) {
             await addOrderingDataToUser(query.message?.chat!.id!, newOrder);
+            //const priceStr = getPriceStr(user.state.jettons,user.state.mainCoin);
+            //newOrder.amount *= user.state.isBuy ? user.state.price : 1/user.state.price
             bot.sendMessage(query.message!.chat.id,`New Order is Succesfuly booked, Press /start`);
         }
         else bot.sendMessage(query.message!.chat.id,`New Order is failed due to invalid balance, Press /start`);
@@ -104,6 +107,7 @@ async function handleTradingCallback (query: CallbackQuery){
         //     keyboardArray[Math.floor(index / 4)]![index % 4] = {text: caption, callback_data: `symbol-${caption}`};
         // });
         // keyboardArray.push([{text:'<< Back', callback_data: 'newStart'}]);
+    
         await bot.editMessageText(
             `🏃 Trading\n\n💡Please type in Jetton's Symbol/Name/address\n\nFor example:\n🔸"jUSDT" or "jusdt" or "JUSDT"\n🔸"Ton Bridge USD"\n🔸"EQBynBO23yw ... STQgGoXwiuA"`,
             {
@@ -123,7 +127,20 @@ async function handleTradingCallback (query: CallbackQuery){
         console.log(error)
     }
 }
-
+export async function handleOrderingBookCommand(query: CallbackQuery){
+    let user = await getUserByTelegramID(query.message!.chat.id);
+    let orderingBtns: InlineKeyboardButton[][] = [];
+    user?.orderingData?.map((order,index)=>{
+        if(orderingBtns[index])orderingBtns[index] = [];
+        orderingBtns[index] = [{text: order.isBuy?'Buy ' + order.jettons[1-order.mainCoin] + ' from ' + order.amount + ' ' + order.jettons[order.mainCoin] + ' at 1' + order.jettons[1- order.mainCoin] + '=' + order.price + ' ' + order.jettons[order.mainCoin]:'Sell '+order.amount + ' ' + order.jettons[1-order.mainCoin] + ' at 1 ' + order.jettons[1- order.mainCoin] + '=' + order.price + ' ' + order.jettons[order.mainCoin]
+        ,callback_data: 'orderclick-' + order._id.toHexString()}]
+    })
+    orderingBtns.push([{text:'<<back', callback_data:'newStart'}]);
+    let state: OrderingData = user?.state!;
+    state!.state='ordermanage'
+    updateUserState(query.message?.chat.id!,state);
+    replyMessage(query.message!,`📕 Ordering Book\n\nClick order button to delete`,orderingBtns);
+}
 export async function handleStartCommand (msg: TelegramBot.Message)  {
     //update / create user info
     const userId = msg.chat?.id ?? 0;
@@ -136,6 +153,7 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
          telegramWalletAddress = prevUser.walletAddress;
          //set userstate idle
          updateUserState(userId,{
+            _id: new mongoose.Types.ObjectId(),
             state: 'idle',
             jettons: ['',''],
             mainCoin: 0,
@@ -167,7 +185,7 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
             })
         );
         const address = wallet.address;
-        let newUser: User = {
+        let newUser = await UserModel.create( {
             telegramID: msg.chat!.id,
             walletAddress: address.toString(),
             secretKey: mnemonics.join(','),
@@ -180,11 +198,12 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
                 price: 0,
                 isBuy: false
             }
-        };
+        });
         await createUser(newUser);
         //save in variable to show
         telegramWalletAddress = address.toString();
     }
+    
     bot.sendMessage(
         msg.chat.id,
         `🏆<b>RewardBot</b>🏆\n
@@ -198,6 +217,7 @@ export async function handleStartCommand (msg: TelegramBot.Message)  {
             [{text:'♻️ Instant Swap', callback_data:'instanteSwap'},{text:'🏃 Book Order',/*web_app:{url:'https://web.ton-rocket.com/trade'}*/ callback_data: JSON.stringify({
                 method: 'tradingCallback'
             })}],
+            [{text:'📕 Ordering Book', callback_data:'orderingBook'}],
             [{text:'🔨 Tools and Settings', callback_data:'setting'}],
             //[{text:'🔗 Connect Your Wallet',callback_data:'walletConnect'},{text:'✂ Disconnect Wallet', callback_data:'disConnect'}],
             //[{text:'📤 Deposit', callback_data:'deposit'},{text:'📥 Withdraw', callback_data:'withdraw'}],
@@ -216,9 +236,9 @@ export async function handleConnectCommand(msg: TelegramBot.Message): Promise<vo
     newConnectRequestListenersMap.get(chatId)?.();
 
     const connector = getConnector(chatId, () => {
-        unsubscribe();
-        newConnectRequestListenersMap.delete(chatId);
-        deleteMessage();
+ //       unsubscribe();
+//        newConnectRequestListenersMap.delete(chatId);
+//        deleteMessage();
     });
 
     await connector.restoreConnection();
